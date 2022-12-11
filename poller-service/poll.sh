@@ -1,0 +1,1 @@
+node downloadXlsx.js && node addDataToDB.js
