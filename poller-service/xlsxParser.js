@@ -106,7 +106,7 @@ async function addTranslatorInterpreter(translatorInterpreter = []) {
       County: county,
       Contacts: contacts,
       Type: OFFICE_TYPES.TRANSLATOR_INTERPRETER,
-      TranslatorInterpreterId: translatorInterpreter.join('')
+      OfficeId: translatorInterpreter.join('')
     }
   }
 
