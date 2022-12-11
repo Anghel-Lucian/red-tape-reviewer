@@ -1,0 +1,27 @@
+{
+  "name": "project-poller-service",
+  "version": "1.0.0",
+  "description": "",
+  "main": "poller.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node downloadXlsx.js && node addDataToDB.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Anghel-Lucian/red-tape-reviewer-poller.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/Anghel-Lucian/red-tape-reviewer-poller/issues"
+  },
+  "homepage": "https://github.com/Anghel-Lucian/red-tape-reviewer-poller#readme",
+  "dependencies": {
+    "aws-sdk": "^2.1272.0",
+    "dotenv": "^16.0.3",
+    "node-xlsx": "^0.21.0",
+    "uuid": "^9.0.0"
+  }
+}
