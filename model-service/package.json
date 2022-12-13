@@ -1,0 +1,17 @@
+{
+  "name": "model-service",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "type": "module",
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.0.3",
+    "rdf-parse": "^2.1.1",
+    "streamify-string": "^1.0.1"
+  }
+}
