@@ -2,16 +2,19 @@ import https from 'https';
 import fs from 'fs';
 import { DATA_GOV_REQUEST_OPTIONS } from './constants.js';
 import {getFilesNameByExtension} from './utils.js';
+import {getConcatenatedNotaries, getConcatenatedTranslatorsAndInterpreters} from './xlsxParser.js';
 
-function downloadFile(url, fileIdentifier) {
+function sourceData(url, fileIdentifier) {
   const file = fs.createWriteStream(`${fileIdentifier}.xlsx`);
   const req = https.request(url, {...DATA_GOV_REQUEST_OPTIONS}, (res) => {
     try {
       res.pipe(file);
 
-      file.on('finish', () => {
+      file.on('finish', async () => {
         file.close();
-        console.log(`Download complete: ${fileIdentifier}`);
+        console.log(`DOWNLOAD COMPLETE: ${fileIdentifier}. STARTING PARSING`);
+        await getConcatenatedNotaries();
+        await getConcatenatedTranslatorsAndInterpreters();
       });
     } catch (err) {
       console.error(err);
@@ -60,7 +63,7 @@ export function getExcelSheets(url) {
         }
 
         console.log("[XLSX DATA SOURCING] FRESH RESOURCE LOCATED. CONTINUING DOWNLOAD");
-        downloadFile(downloadedResource.datagovro_download_url, `${downloadedResource.name.replaceAll(' ', '_')}[[${downloadedResource.last_modified}]]`);
+        sourceData(downloadedResource.datagovro_download_url, `${downloadedResource.name.replaceAll(' ', '_')}[[${downloadedResource.last_modified}]]`);
       } catch (err) {
         console.error(err);
       }
@@ -71,5 +74,5 @@ export function getExcelSheets(url) {
     console.error(e);
   })
   
-  reqNotaries.end();  
+  reqNotaries.end(); 
 }

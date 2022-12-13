@@ -138,6 +138,8 @@ function parseXlsxFile(path) {
   } catch(e) {
     console.error(e);
   }
+
+  return [];
 }
 
 export async function getConcatenatedNotaries() {

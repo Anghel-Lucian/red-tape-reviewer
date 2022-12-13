@@ -9,3 +9,4 @@ export const OFFICE_TYPES = {
   NOTARY: 'Notary',
   TRANSLATOR_INTERPRETER: 'Translator/Interpreter'
 }
+export const WEEK_IN_MILLISECONDS = 604800000;
