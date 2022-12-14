@@ -1,0 +1,53 @@
+{
+  "@context": "https://schema.org/",
+  "@type": "LocalBusiness",
+  "name": "Felix Translator",
+  "address": {
+    "@type": "PostalAddress",
+    "addressRegion": "Botosani",
+    "streetAddress": "Calea Notarilor, Nr. 23"
+  },
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "5",
+    "ratingCount": "1"
+  },
+  "reviews": {
+    "@type": "ItemList",
+    "itemListElement": [
+      {
+        "@type": "Review",
+        "reviewRating": "5",
+        "reviewAspect": "Title title",
+        "reviewBody": "Comment of review",
+        "creator": {
+          "@type": "Person",
+          "@id": "http://red-tape-reviewer.com/user-1"
+        }
+      }
+    ]
+  },
+  "hasOfferCatalog": {
+    "@type": "OfferCatalog",
+    "name": "Translated/Interpreter Languages",
+    "itemListElement": [
+      {
+        "@type": "Offer",
+        "itemOffered": {
+          "@type": "Service",
+          "name": "English",
+          "price": "25.99",
+          "priceCurrency": "RON"
+        }
+      }
+    ]
+  },
+  "openingHours": {
+    "@type": "openingHours",
+    "value": "Mo-Su 10am-9pm"
+  },
+  "telephone": {
+    "@type": "telephone",
+    "value": "0234123579"
+  }
+}
