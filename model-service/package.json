@@ -10,6 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "aws-sdk": "^2.1275.0",
     "dotenv": "^16.0.3",
     "rdf-parse": "^2.1.1",
     "streamify-string": "^1.0.1"
