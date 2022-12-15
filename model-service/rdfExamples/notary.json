@@ -42,12 +42,6 @@
       }
     ]
   },
-  "openingHours": {
-    "@type": "openingHours",
-    "value": "Mo-Su 10am-9pm"
-  },
-  "telephone": {
-    "@type": "telephone",
-    "value": "0234123579"
-  }
+  "openingHours": "Mo-Su 10am-9pm",
+  "telephone": "0234123579"
 }

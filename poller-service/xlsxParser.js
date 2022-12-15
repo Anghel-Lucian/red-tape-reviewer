@@ -12,7 +12,7 @@ AWS.config.update({
   secretAccessKey: process.env.SECRET_ACCESS_KEY
 });
 
-const docClient = new AWS.DynamoDB.DocumentClient();
+const dynamoDb = new AWS.DynamoDB();
 
 async function addNotary(notaryEntry = []) {
   let [fullName, room, address, city, county] = notaryEntry;
@@ -43,19 +43,38 @@ async function addNotary(notaryEntry = []) {
 
   const params = {
     TableName: process.env.OFFICES_TABLE,
-    Item: {
-      Name: name,
-      FirstName: firstName,
-      Room: room,
-      Address: address,
-      City: city,
-      County: county,
-      Type: OFFICE_TYPES.NOTARY,
-      OfficeId: notaryEntry.join('')
+    Key: {
+      OfficeId: {
+        S: notaryEntry.join('')
+      }
+    },
+    UpdateExpression: "SET LastName = :lastName, FirstName = :firstName, Room = :room, Address = :address, City = :city, County = :county, OfficeType = :officeType",
+    ExpressionAttributeValues: {
+      ":lastName": {
+        S: name || ""
+      },
+      ":firstName": {
+        S: firstName || ""
+      },
+      ":room": {
+        S: room || ""
+      },
+      ":address": {
+        S: address || ""
+      },
+      ":city": {
+        S: city || ""
+      },
+      ":county": {
+        S: county || ""
+      },
+      ":officeType": {
+        S: OFFICE_TYPES.NOTARY || ""
+      }
     }
   }
 
-  docClient.put(params, function(err, data) {
+  dynamoDb.updateItem(params, function(err, data) {
     if(err) {
       console.log("[NOTARY ADDITION FAILED]: ERROR WHEN PUTTING IN NOTARY TABLE", err);
       return;
@@ -97,20 +116,41 @@ async function addTranslatorInterpreter(translatorInterpreter = []) {
 
   const params = {
     TableName: process.env.OFFICES_TABLE,
-    Item: {
-      Name: name,
-      FirstName: firstName,
-      CourtOfAppeal: courtOfAppeal,
-      Languages: languages,
-      AuthorizationNumber: authorizationNumber,
-      County: county,
-      Contacts: contacts,
-      Type: OFFICE_TYPES.TRANSLATOR_INTERPRETER,
-      OfficeId: translatorInterpreter.join('')
+    Key: {
+      OfficeId: {
+        S: translatorInterpreter.join('')
+      }
+    },
+    UpdateExpression: "SET LastName = :lastName, FirstName = :firstName, CourtOfAppeal = :courtOfAppeal, County = :county, Languages = :languages, AuthorizationNumber = :authorizationNumber, Contacts = :contacts, OfficeType = :officeType",
+    ExpressionAttributeValues: {
+      ":lastName": {
+        S: name || ""
+      },
+      ":firstName": {
+        S: firstName || ""
+      },
+      ":courtOfAppeal": {
+        S: courtOfAppeal || ""
+      },
+      ":languages": {
+        S: languages || ""
+      },
+      ":authorizationNumber": {
+        S: "_" + authorizationNumber || ""
+      },
+      ":county": {
+        S: county || ""
+      },
+      ":contacts": {
+        S: "_" + contacts || ""
+      },
+      ":officeType": {
+        S: OFFICE_TYPES.TRANSLATOR_INTERPRETER || ""
+      }
     }
   }
 
-  docClient.put(params, function(err, data) {
+  dynamoDb.updateItem(params, function(err, data) {
     if(err) {
       console.log("[TRANSLATOR-INTERPRETER ADDITION FAILED]: ERROR WHEN PUTTING IN TRANSLATOR-INTERPRETER TABLE", err);
       return;

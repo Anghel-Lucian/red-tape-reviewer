@@ -9,25 +9,30 @@ const server = http.createServer(function(req, res) {
   const queryString = parsedURL.query;
   const headers = req.headers;
   const method = req.method.toLowerCase();
+  const resBuffer = [];
 
   req.on("data", async (data) => {
-    console.log(data);
-    console.log(await data.json())
+    resBuffer.push(data);
     console.log(`[REQUEST WITH DATA RECEIVED: ${path} | ${method}]`);
   });
 
   req.on("end", function() {
+    let payload;
+
+    if (resBuffer.length > 0) {
+      payload = JSON.parse(Buffer.concat(resBuffer).toString());
+    }
+
     console.log(`[SENDING RESPONSE: ${path} | ${method}]`);
     const route = typeof routes[path] !== "undefined" ? routes[path] : routes["notFound"];
     const data = {
       path,
       queryString,
       headers,
-      method
+      method,
+      requestPayload: payload
     };
 
-    //pass data incase we need info about the request
-    //pass the response object because router is outside our scope
     route(data, res);
   });
 });
