@@ -3,18 +3,20 @@ import AWS from 'aws-sdk';
 import dotenv from 'dotenv';
 import {getFilesNameByExtension} from './utils.js';
 import {OFFICE_TYPES} from './constants.js';
+import marklogic from 'marklogic';
 
 dotenv.config();
 
-AWS.config.update({
-  region: process.env.REGION,
-  accessKeyId: process.env.ACCESS_KEY_ID,
-  secretAccessKey: process.env.SECRET_ACCESS_KEY
-});
+const db = marklogic.createDatabaseClient({
+  host:     process.env.DB_HOST,
+  port:     process.env.DB_PORT,
+  database: process.env.DB_NAME,
+  user:     process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  authType: process.env.DB_AUTH_TYPE
+})
 
-const dynamoDb = new AWS.DynamoDB();
-
-async function addNotary(notaryEntry = []) {
+function addNotary(notaryEntry = []) {
   let [fullName, room, address, city, county] = notaryEntry;
   let [name, firstName, otherFirstName] = fullName.split(" ");
 
@@ -41,50 +43,32 @@ async function addNotary(notaryEntry = []) {
     county = undefined;
   }
 
-  const params = {
-    TableName: process.env.OFFICES_TABLE,
-    Key: {
-      OfficeId: {
-        S: notaryEntry.join('')
-      }
-    },
-    UpdateExpression: "SET LastName = :lastName, FirstName = :firstName, Room = :room, Address = :address, City = :city, County = :county, OfficeType = :officeType",
-    ExpressionAttributeValues: {
-      ":lastName": {
-        S: name || ""
-      },
-      ":firstName": {
-        S: firstName || ""
-      },
-      ":room": {
-        S: room || ""
-      },
-      ":address": {
-        S: address || ""
-      },
-      ":city": {
-        S: city || ""
-      },
-      ":county": {
-        S: county || ""
-      },
-      ":officeType": {
-        S: OFFICE_TYPES.NOTARY || ""
-      }
+  const id = notaryEntry.join('').replaceAll(' ', '').toLowerCase();
+  const uri = `http://red-tape-reviewer.com/offices/${id}`;
+  const addressUri = `http://red-tape-reviewer.com/addresses/${id}`;
+  const queryRows = [
+    'PREFIX schema: <http://schema.org/>',
+    'INSERT DATA {',
+    ` ${name ? `<${uri}> schema:name "${name} ${firstName}" .` : ''}`,
+    ` <${uri}> schema:additionalType schema:Notary .`,
+    ` ${room || address || city || county ? `<${uri}> schema:address <${addressUri}> .` : ''}`,
+    ` ${city || room || county ? `<${addressUri}> schema:addressRegion "${city || room || county}" .` : ''}`,
+    ` ${address ? `<${addressUri}> schema:streetAddress "${address}" .` : ''}`,
+    `}`
+  ];
+
+  let sparqlQuery = '';
+
+  for (let row of queryRows) {
+    if (row) {
+      sparqlQuery += row + '\n';
     }
   }
 
-  dynamoDb.updateItem(params, function(err, data) {
-    if(err) {
-      console.log("[NOTARY ADDITION FAILED]: ERROR WHEN PUTTING IN NOTARY TABLE", err);
-      return;
-    }
-
-    console.log("[NOTARY ADDITION SUCCESSFUL]: NOTARY ENTITY PUT IN NOTARY TABLE");
-  })
+  db.graphs.sparqlUpdate(sparqlQuery);
 }
 
-async function addTranslatorInterpreter(translatorInterpreter = []) {
+function addTranslatorInterpreter(translatorInterpreter = []) {
   let [fullName, courtOfAppeal, languages, authorizationNumber, county, contacts] = translatorInterpreter;
   let [name, firstName, otherFirstName] = fullName?.split(" ");
 
@@ -113,51 +97,46 @@ async function addTranslatorInterpreter(translatorInterpreter = []) {
   if (contacts == 'NULL') {
     contacts = undefined;
   }
+  if (languages) {
+    languages = languages.split(",")
+  }
 
-  const params = {
-    TableName: process.env.OFFICES_TABLE,
-    Key: {
-      OfficeId: {
-        S: translatorInterpreter.join('')
-      }
-    },
-    UpdateExpression: "SET LastName = :lastName, FirstName = :firstName, CourtOfAppeal = :courtOfAppeal, County = :county, Languages = :languages, AuthorizationNumber = :authorizationNumber, Contacts = :contacts, OfficeType = :officeType",
-    ExpressionAttributeValues: {
-      ":lastName": {
-        S: name || ""
-      },
-      ":firstName": {
-        S: firstName || ""
-      },
-      ":courtOfAppeal": {
-        S: courtOfAppeal || ""
-      },
-      ":languages": {
-        S: languages || ""
-      },
-      ":authorizationNumber": {
-        S: "_" + authorizationNumber || ""
-      },
-      ":county": {
-        S: county || ""
-      },
-      ":contacts": {
-        S: "_" + contacts || ""
-      },
-      ":officeType": {
-        S: OFFICE_TYPES.TRANSLATOR_INTERPRETER || ""
-      }
+  const id = translatorInterpreter.join('').replaceAll(' ', '').toLowerCase();
+  const uri = `http://red-tape-reviewer.com/offices/${id}`;
+  const addressUri = `http://red-tape-reviewer.com/addresses/${id}`;
+  const offerCatalogUri = `http://red-tape-reviewer.com/offers/${id}`;
+  let languageOffers = [];
+
+  languages?.forEach(language => {
+    const sanitizedLanguage = language.trim();
+    const languageUri = `${offerCatalogUri}/${sanitizedLanguage}`;
+
+    languageOffers.push(`<${offerCatalogUri}> schema:itemListElement <${languageUri}> .`);
+    languageOffers.push(`<${languageUri}> schema:name <${sanitizedLanguage}> .`);
+  });
+
+  const queryRows = [
+    'PREFIX schema: <http://schema.org/>',
+    'INSERT DATA {',
+    ` <${uri}> schema:additionalType schema:LocalBusiness .`,
+    ` ${name ? `<${uri}> schema:name "${name} ${firstName}" .` : ''}`,
+    ` ${county ? `<${uri}> schema:address <${addressUri}> .` : ''}`,
+    ` ${county ? `<${addressUri}> schema:addressRegion "${county}" .` : ''}`,
+    ` ${languages ? `<${uri}> schema:hasOfferCatalog <${offerCatalogUri}> .` : ''}`,
+    ` ${languages ? languageOffers.join("\n") : ''}`,
+    ` ${contacts ? `<${uri}> schema:telephone "${contacts}"` : ''}`,
+    `}`
+  ];
+
+  let sparqlQuery = '';
+
+  for (let row of queryRows) {
+    if (row) {
+      sparqlQuery += row + '\n';
     }
   }
 
-  dynamoDb.updateItem(params, function(err, data) {
-    if(err) {
-      console.log("[TRANSLATOR-INTERPRETER ADDITION FAILED]: ERROR WHEN PUTTING IN TRANSLATOR-INTERPRETER TABLE", err);
-      return;
-    }
-
-    console.log("[TRANSLATOR-INTERPRETER ADDITION SUCCESSFUL]: TRANSLATOR-INTERPRETER ENTITY PUT IN TRANSLATOR-INTERPRETER TABLE");
-  })
+  db.graphs.sparqlUpdate(sparqlQuery);
 }
 
 function parseXlsxFile(path) {
@@ -191,10 +170,7 @@ export async function getConcatenatedNotaries() {
   }
 
   for (let i = 0; i < notaries.length; i++) {
-    console.log('[XLSX PARSER:NOTARY] THROTTLING DB INSERTION (250ms)');
-    await new Promise(resolve => setTimeout(resolve, 250));
-    console.log('[XLSX PARSER:NOTARY] STOP THROTTLING DB INSERTION (250ms)');
-    await addNotary(notaries[i]);
+    addNotary(notaries[i]);
   }
 }
 
@@ -207,9 +183,9 @@ export async function getConcatenatedTranslatorsAndInterpreters() {
   }
 
   for (let i = 0; i < translatorsAndInterpreters.length; i++) {
-    console.log('[XLSX PARSER:TRANSLATORS_INTERPRETERS] THROTTLING DB INSERTION (250ms)');
-    await new Promise(resolve => setTimeout(resolve, 250));
-    console.log('[XLSX PARSER:TRANSLATORS_INTERPRETERS] STOP THROTTLING DB INSERTION (250ms)');
-    await addTranslatorInterpreter(translatorsAndInterpreters[i]);  
+    addTranslatorInterpreter(translatorsAndInterpreters[i]);  
   }
 }
+
+getConcatenatedNotaries();
+getConcatenatedTranslatorsAndInterpreters();
