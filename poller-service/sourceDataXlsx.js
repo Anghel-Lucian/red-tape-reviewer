@@ -13,8 +13,12 @@ function sourceData(url, fileIdentifier) {
       file.on('finish', async () => {
         file.close();
         console.log(`DOWNLOAD COMPLETE: ${fileIdentifier}. STARTING PARSING`);
-        await getConcatenatedNotaries();
-        await getConcatenatedTranslatorsAndInterpreters();
+        await new Promise(resolve => setTimeout(resolve, 2500));
+        if (fileIdentifier.includes('Traducator')) {
+          await getConcatenatedTranslatorsAndInterpreters();
+        } else {
+          await getConcatenatedNotaries();
+        }
       });
     } catch (err) {
       console.error(err);

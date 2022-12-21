@@ -18,7 +18,7 @@ const db = marklogic.createDatabaseClient({
 
 function addNotary(notaryEntry = []) {
   let [fullName, room, address, city, county] = notaryEntry;
-  let [name, firstName, otherFirstName] = fullName.split(" ");
+  let [name, firstName, otherFirstName] = fullName?.split(" ");
 
   if (otherFirstName) {
     firstName = `${firstName} ${otherFirstName}`;
@@ -164,6 +164,7 @@ function parseXlsxFile(path) {
 }
 
 export async function getConcatenatedNotaries() {
+  console.log('[XLSX PARSER]: LOADING NOTARIES IN DB');
   const fileNames = await getFilesNameByExtension('./', 'xlsx', 'Notari');
   let notaries = [];
 
@@ -171,12 +172,13 @@ export async function getConcatenatedNotaries() {
     notaries = [...notaries, ...parseXlsxFile(`./${fileName}`)];
   }
 
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < notaries.length; i++) {
     addNotary(notaries[i]);
   }
 }
 
 export async function getConcatenatedTranslatorsAndInterpreters() {
+  console.log('[XLSX PARSER]: LOADING TRANSLATORS-INTERPRETERS IN DB');
   const fileNames = await getFilesNameByExtension('./', 'xlsx', 'Traducatori');
   let translatorsAndInterpreters = [];
 
@@ -184,10 +186,7 @@ export async function getConcatenatedTranslatorsAndInterpreters() {
     translatorsAndInterpreters = [...translatorsAndInterpreters, ...parseXlsxFile(`./${fileName}`)];
   }
 
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < translatorsAndInterpreters.length; i++) {
     addTranslatorInterpreter(translatorsAndInterpreters[i]);  
   }
 }
-
-getConcatenatedNotaries();
-getConcatenatedTranslatorsAndInterpreters();
