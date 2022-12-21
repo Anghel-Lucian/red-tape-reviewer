@@ -49,6 +49,7 @@ function addNotary(notaryEntry = []) {
   const queryRows = [
     'PREFIX schema: <http://schema.org/>',
     'INSERT DATA {',
+    ` <${uri}> schema:identifier "${id}" .`,
     ` ${name ? `<${uri}> schema:name "${name} ${firstName}" .` : ''}`,
     ` <${uri}> schema:additionalType schema:Notary .`,
     ` ${room || address || city || county ? `<${uri}> schema:address <${addressUri}> .` : ''}`,
@@ -118,6 +119,7 @@ function addTranslatorInterpreter(translatorInterpreter = []) {
   const queryRows = [
     'PREFIX schema: <http://schema.org/>',
     'INSERT DATA {',
+    ` <${uri}> schema:identifier "${id}" .`,
     ` <${uri}> schema:additionalType schema:LocalBusiness .`,
     ` ${name ? `<${uri}> schema:name "${name} ${firstName}" .` : ''}`,
     ` ${county ? `<${uri}> schema:address <${addressUri}> .` : ''}`,
@@ -169,7 +171,7 @@ export async function getConcatenatedNotaries() {
     notaries = [...notaries, ...parseXlsxFile(`./${fileName}`)];
   }
 
-  for (let i = 0; i < notaries.length; i++) {
+  for (let i = 0; i < 5; i++) {
     addNotary(notaries[i]);
   }
 }
@@ -182,7 +184,7 @@ export async function getConcatenatedTranslatorsAndInterpreters() {
     translatorsAndInterpreters = [...translatorsAndInterpreters, ...parseXlsxFile(`./${fileName}`)];
   }
 
-  for (let i = 0; i < translatorsAndInterpreters.length; i++) {
+  for (let i = 0; i < 5; i++) {
     addTranslatorInterpreter(translatorsAndInterpreters[i]);  
   }
 }
