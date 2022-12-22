@@ -65,9 +65,9 @@ async function addNotary(notaryEntry = []) {
   }
 
   const id = notaryEntry.join('').replaceAll(' ', '').toLowerCase();
-  const uri = `http://red-tape-reviewer.com/resource/${id}`;
-  const addressUri = `http://red-tape-reviewer.com/resource/address-${id}`;
-  const mapUri = `http://red-tape-reviewer.com/resource/map-${id}`;
+  const uri = `http://red-tape-reviewer.com/offices/${id}`;
+  const addressUri = `http://red-tape-reviewer.com/addresses/${id}`;
+  const mapUri = `http://red-tape-reviewer.com/maps/${id}`;
   let lng, lat;
 
   if (address && (room || city || county)) {
@@ -143,17 +143,15 @@ function addTranslatorInterpreter(translatorInterpreter = []) {
   }
 
   const id = translatorInterpreter.join('').replaceAll(' ', '').toLowerCase();
-  const uri = `http://red-tape-reviewer.com/resource/${id}`;
-  const addressUri = `http://red-tape-reviewer.com/resource/address-${id}`;
-  const offerCatalogUri = `http://red-tape-reviewer.com/resource/offers-${id}`;
+  const uri = `http://red-tape-reviewer.com/offices/${id}`;
+  const addressUri = `http://red-tape-reviewer.com/addresses/${id}`;
+  const offerCatalogUri = `http://red-tape-reviewer.com/offers/${id}`;
   let languageOffers = [];
 
   languages?.forEach(language => {
     const sanitizedLanguage = language.trim();
-    const languageUri = `${offerCatalogUri}/${sanitizedLanguage}`;
 
-    languageOffers.push(`<${offerCatalogUri}> schema:itemListElement <${languageUri}> .`);
-    languageOffers.push(`<${languageUri}> schema:name <${sanitizedLanguage}> .`);
+    languageOffers.push(`<${offerCatalogUri}> schema:itemListElement "${sanitizedLanguage}" .`);
   });
 
   const queryRows = [
