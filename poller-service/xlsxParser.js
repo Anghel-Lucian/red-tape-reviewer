@@ -150,8 +150,13 @@ function addTranslatorInterpreter(translatorInterpreter = []) {
 
   languages?.forEach(language => {
     const sanitizedLanguage = language.trim();
+    const offerCatalogItem = `${offerCatalogUri}-item`;
+    const offerUri = `http://red-tape-reviewer.com/services/${id}`;
 
-    languageOffers.push(`<${offerCatalogUri}> schema:itemListElement "${sanitizedLanguage}" .`);
+    languageOffers.push(`<${offerCatalogUri}> schema:itemListElement <${offerCatalogItem}> .`);
+    languageOffers.push(`<${offerCatalogItem}> schema:item <${offerUri}> .`)
+    languageOffers.push(`<${offerUri}> rdf:type schema:Offer .`)
+    languageOffers.push(`<${offerUri}> schema:name "${sanitizedLanguage}" .`);
   });
 
   const queryRows = [
