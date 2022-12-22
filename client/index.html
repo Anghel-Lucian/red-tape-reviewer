@@ -16,7 +16,9 @@
 <body>
   <div id="map"></div>
   <script>
-    mapboxgl.accessToken = 'my_key';
+    const url = new URLSearchParams(document.location.search);
+
+    mapboxgl.accessToken = url.get("key");
     const map = new mapboxgl.Map({
       container: 'map',
       style: 'mapbox://styles/mapbox/streets-v12',
@@ -24,10 +26,8 @@
       zoom: 6
     });
     
-    const url = new URLSearchParams(document.location.search);
-
     const marker = new mapboxgl.Marker()
-      .setLngLat([url.get("lng"), url.get("lng")])
+      .setLngLat([url.get("lng"), url.get("lat")])
       .addTo(map);
   </script>
 </body>
