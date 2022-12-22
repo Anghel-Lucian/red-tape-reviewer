@@ -233,6 +233,3 @@ export async function getConcatenatedTranslatorsAndInterpreters() {
     addTranslatorInterpreter(translatorsAndInterpreters[i]);  
   }
 }
-
-getConcatenatedNotaries();
-getConcatenatedTranslatorsAndInterpreters();
