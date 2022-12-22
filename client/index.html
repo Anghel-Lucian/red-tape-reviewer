@@ -16,7 +16,7 @@
 <body>
   <div id="map"></div>
   <script>
-    const url = new URLSearchParams(document.location.search);
+    const url = new URLSearchParams(document.location.search.replaceAll(/&amp;/g, "&"));
 
     mapboxgl.accessToken = url.get("key");
     const map = new mapboxgl.Map({
