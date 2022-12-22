@@ -20,6 +20,7 @@
   "homepage": "https://github.com/Anghel-Lucian/red-tape-reviewer-poller#readme",
   "dependencies": {
     "aws-sdk": "^2.1272.0",
+    "axios": "^1.2.1",
     "dotenv": "^16.0.3",
     "marklogic": "^2.9.1",
     "node-xlsx": "^0.21.0",

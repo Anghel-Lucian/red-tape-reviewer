@@ -1,11 +1,32 @@
 import xlsx from 'node-xlsx';
-import AWS from 'aws-sdk';
 import dotenv from 'dotenv';
 import {getFilesNameByExtension} from './utils.js';
-import {OFFICE_TYPES} from './constants.js';
 import marklogic from 'marklogic';
+import axios from 'axios';
 
 dotenv.config();
+
+async function getCoordinates(address) {
+  const url = 'https://api.mapbox.com/geocoding/v5/mapbox.places/'
+  + encodeURIComponent(address) + '.json?access_token='
+  + process.env.MAP_API_KEY + '&limit=1';
+  const axiosOptions = {
+    url,
+    method: 'GET',
+    headers: {}
+  }
+  const {data} = await axios(axiosOptions);
+
+  if (data?.message || !data.features?.length || !data.features[0].center?.length) {
+    console.log(data);
+    return;
+  }
+
+  return {
+    lng: data.features[0].center[0],
+    lat: data.features[0].center[1]
+  }
+}
 
 const db = marklogic.createDatabaseClient({
   host:     process.env.DB_HOST,
@@ -16,7 +37,7 @@ const db = marklogic.createDatabaseClient({
   authType: process.env.DB_AUTH_TYPE
 })
 
-function addNotary(notaryEntry = []) {
+async function addNotary(notaryEntry = []) {
   let [fullName, room, address, city, county] = notaryEntry;
   let [name, firstName, otherFirstName] = fullName?.split(" ");
 
@@ -44,20 +65,39 @@ function addNotary(notaryEntry = []) {
   }
 
   const id = notaryEntry.join('').replaceAll(' ', '').toLowerCase();
-  const uri = `http://red-tape-reviewer.com/offices/${id}`;
-  const addressUri = `http://red-tape-reviewer.com/addresses/${id}`;
+  const uri = `http://red-tape-reviewer.com/resource/${id}`;
+  const addressUri = `http://red-tape-reviewer.com/resource/address-${id}`;
+  const mapUri = `http://red-tape-reviewer.com/resource/map-${id}`;
+  let lng, lat;
+
+  if (address && (room || city || county)) {
+    const coordinates = await getCoordinates(`${address} ${room || city || county}`);
+    
+    if (typeof coordinates.lng === 'number' && typeof coordinates.lat === 'number') {
+      lng = coordinates.lng;
+      lat = coordinates.lat;
+    }
+  }
+
   const queryRows = [
     'PREFIX schema: <http://schema.org/>',
+    'PREFIX rdf: <https://www.w3.org/1999/02/22-rdf-syntax-ns#>',
     'INSERT DATA {',
     ` <${uri}> schema:identifier "${id}" .`,
     ` ${name ? `<${uri}> schema:name "${name} ${firstName}" .` : ''}`,
-    ` <${uri}> schema:additionalType schema:Notary .`,
+    ` <${uri}> rdf:type schema:Notary .`,
+    ` ${lng && lat ? `<${uri}> schema:longitude "${lng}" .` : ''}`,
+    ` ${lng && lat ? `<${uri}> schema:latitude "${lat}" .` : ''}`,
+    ` ${lng && lat ? `<${uri}> schema:hasMap <${mapUri}> .` : ''}`,
+    ` ${lng && lat ? `<${mapUri}> schema:archivedAt <http://red-tape-reviewer.netlify.app/map?lng=${lng}&lat=${lat}&key=${process.env.MAP_API_KEY}> .` : ''}`,
+    ` ${lng && lat ? `<${mapUri}> schema:copyrightHolder <https://dbpedia.org/resource/Mapbox> . ` : ''}`,
+    ` ${lng && lat ? `<${mapUri}> schema:creator <https://dbpedia.org/resource/Mapbox> . ` : ''}`,
+    ` ${lng && lat ? `<${mapUri}> schema:sdPublisher <http://red-tape-reviewer.com/resource/RedTapeReviewer> . ` : ''}`,
     ` ${room || address || city || county ? `<${uri}> schema:address <${addressUri}> .` : ''}`,
     ` ${city || room || county ? `<${addressUri}> schema:addressRegion "${city || room || county}" .` : ''}`,
     ` ${address ? `<${addressUri}> schema:streetAddress "${address}" .` : ''}`,
     `}`
   ];
-
   let sparqlQuery = '';
 
   for (let row of queryRows) {
@@ -103,9 +143,9 @@ function addTranslatorInterpreter(translatorInterpreter = []) {
   }
 
   const id = translatorInterpreter.join('').replaceAll(' ', '').toLowerCase();
-  const uri = `http://red-tape-reviewer.com/offices/${id}`;
-  const addressUri = `http://red-tape-reviewer.com/addresses/${id}`;
-  const offerCatalogUri = `http://red-tape-reviewer.com/offers/${id}`;
+  const uri = `http://red-tape-reviewer.com/resource/${id}`;
+  const addressUri = `http://red-tape-reviewer.com/resource/address-${id}`;
+  const offerCatalogUri = `http://red-tape-reviewer.com/resource/offers-${id}`;
   let languageOffers = [];
 
   languages?.forEach(language => {
@@ -118,15 +158,16 @@ function addTranslatorInterpreter(translatorInterpreter = []) {
 
   const queryRows = [
     'PREFIX schema: <http://schema.org/>',
+    'PREFIX rdf: <https://www.w3.org/1999/02/22-rdf-syntax-ns#>',
     'INSERT DATA {',
     ` <${uri}> schema:identifier "${id}" .`,
-    ` <${uri}> schema:additionalType schema:LocalBusiness .`,
+    ` <${uri}> rdf:type schema:LocalBusiness .`,
     ` ${name ? `<${uri}> schema:name "${name} ${firstName}" .` : ''}`,
     ` ${county ? `<${uri}> schema:address <${addressUri}> .` : ''}`,
     ` ${county ? `<${addressUri}> schema:addressRegion "${county}" .` : ''}`,
     ` ${languages ? `<${uri}> schema:hasOfferCatalog <${offerCatalogUri}> .` : ''}`,
     ` ${languages ? languageOffers.join("\n") : ''}`,
-    ` ${contacts ? `<${uri}> schema:telephone "${contacts}"` : ''}`,
+    ` ${contacts ? `<${uri}> schema:telephone "${contacts}" .` : ''}`,
     `}`
   ];
 
@@ -173,7 +214,9 @@ export async function getConcatenatedNotaries() {
   }
 
   for (let i = 0; i < notaries.length; i++) {
-    addNotary(notaries[i]);
+    console.log("[XLSX PARSER] THROTTLING NOTARY INSERTION (500ms)");
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await addNotary(notaries[i]);
   }
 }
 
@@ -190,3 +233,6 @@ export async function getConcatenatedTranslatorsAndInterpreters() {
     addTranslatorInterpreter(translatorsAndInterpreters[i]);  
   }
 }
+
+getConcatenatedNotaries();
+getConcatenatedTranslatorsAndInterpreters();
