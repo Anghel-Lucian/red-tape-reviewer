@@ -101,16 +101,19 @@ export default class Office {
     if (officeData.offerCatalog) {
       const catalogQuery = `
         PREFIX schema: <http://schema.org/>
+        PREFIX rdf: <https://www.w3.org/1999/02/22-rdf-syntax-ns#>
 
         SELECT ?name ?price ?description WHERE {
-          <http://red-tape-reviewer.com/services/${officeId}> schema:name ?name .
+          ?s rdf:type schema:Offer .
+          ?s schema:offeredBy <http://red-tape-reviewer.com/offices/${officeId}> .
+          ?s schema:name ?name .
 
           OPTIONAL {
-            <http://red-tape-reviewer.com/services/${officeId}> schema:price ?price .
+            ?s schema:price ?price .
           }
 
           OPTIONAL {
-            <http://red-tape-reviewer.com/services/${officeId}> schema:description ?description .
+            ?s schema:description ?description .
           }
         }
       `;
@@ -209,8 +212,67 @@ export default class Office {
     }
 
     if (office.offerCatalog?.length) {
-      office.offerCatalog.forEach(offer => {
-        // TODO: continue with adding offers
+      const offerCatalogExistsQuery = `
+        PREFIX schema: <http://schema.org>
+
+        ASK { <http://red-tape-reviewer.com/offers/${office.id}> ?p ?o }
+      `;
+
+      const offerCatalogExistsQueryResult = await db.graphs.sparql('application/sparql-results+json', offerCatalogExistsQuery).result();
+      const offerCatalogUri = `http://red-tape-reviewer.com/offers/${office.id}`
+
+      // if offer catalog doesn't exist, create one
+      if (!offerCatalogExistsQueryResult.boolean) {
+        const insertOfferCatalogQuery = `
+          PREFIX schema: <http://schema.org>
+
+          INSERT DATA {
+            <http://red-tape-reviewer.com/offices/${office.id}> schema:hasOfferCatalog <${offerCatalogUri}> .
+          }
+        `;
+
+        await db.graphs.sparqlUpdate(insertOfferCatalogQuery);
+      } else { // TODO: delete this debugging else branch
+        console.log("Offer catalog exists");
+      }
+
+      // for each offerCatalog item in the payload, create or update one
+      office.offerCatalog.forEach(async offer => {
+        const offerNameExistsQuery = `
+          PREFIX schema: <http://schema.org/>
+
+          ASK { 
+            ?s schema:name "${offer.name}" .
+            ?s schema:offeredBy <http://red-tape-reviewer.com/offices/${office.id}> .
+          }
+        `;
+
+        const offerNameExistsQueryResult = await db.graphs.sparql('application/sparql-results+json', offerNameExistsQuery).result();
+
+        // if offer doesn't exist create an entirely new offer
+        if (!offerNameExistsQueryResult.boolean) {
+          const offerCatalogItemUri = `${offerCatalogUri}-item`;
+          const offerUri = `http://red-tape-reviewer.com/services/${office.id}-${offer.name.toLowerCase()}`;
+
+          const insertOfferQuery = `
+            PREFIX schema: <http://schema.org/>
+            PREFIX rdf: <https://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+            INSERT DATA {
+              <${offerCatalogUri}> schema:itemListElement <${offerCatalogItemUri}> .
+              <${offerCatalogItemUri}> schema:item <${offerUri}> .
+              <${offerUri}> rdf:type schema:Offer .
+              <${offerUri}> schema:name "${offer.name}" .
+              <${offerUri}> schema:offeredBy <http://red-tape-reviewer.com/offices/${office.id}> .
+              ${offer.price ? `<${offerUri}> schema:price "${offer.price}" .` : ''}
+              ${offer.description ? `<${offerUri}> schema:description "${offer.description}" .` : ''}
+            }
+          `;
+
+          await db.graphs.sparqlUpdate(insertOfferQuery);
+        } else { // TODO: if offer already exists, add the new attributes to it
+          console.log("offer already exists");
+        }
       });
     }
 
@@ -291,23 +353,28 @@ export default class Office {
   // TODO: create function for posting reviews
 }
 
-// await Office.getOfficeById('ababeioana-mihaelaploieştifranceză36656prahova732439340');
+// await Office.getOfficeById('aaneiandreea-ramonasuceavaitaliană32150suceava742364955');
 console.log(await Office.updateOffice({
-  id: 'ababeicarmenbeatricegalaţifranceză6396galati',
+  id: 'aaneiandreea-ramonasuceavaitaliană32150suceava742364955',
   // streetAddress: 'Strada 8 Martie',
   // openingHours: 'Overriden from backend',
   // telephone: 'new telephone from backend',
   // addition and modification of offers possible
   offerCatalog: [
     {
-      name: 'Franceză',
+      name: 'Italiană',
       price: '24.99',
-      description: 'Traducere si interpretare din si in Franceză'
+      description: 'Traducere si interpretare din si in Italiană'
     },
     {
       name: 'English',
       price: '15.00',
       description: 'Translation and interpretation from and to English'
+    },
+    {
+      name: 'Chinese',
+      price: '50.00',
+      description: 'Translation and interpretation from and to Chinese'
     }
   ]
 }))

@@ -151,7 +151,7 @@ function addTranslatorInterpreter(translatorInterpreter = []) {
   languages?.forEach(language => {
     const sanitizedLanguage = language.trim();
     const offerCatalogItem = `${offerCatalogUri}-item`;
-    const offerUri = `http://red-tape-reviewer.com/services/${id}`;
+    const offerUri = `http://red-tape-reviewer.com/services/${id}-${sanitizedLanguage.toLowerCase()}`;
 
     languageOffers.push(`<${offerCatalogUri}> schema:itemListElement <${offerCatalogItem}> .`);
     languageOffers.push(`<${offerCatalogItem}> schema:item <${offerUri}> .`)
