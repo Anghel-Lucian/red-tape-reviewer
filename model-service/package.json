@@ -11,6 +11,7 @@
   "license": "ISC",
   "dependencies": {
     "aws-sdk": "^2.1275.0",
+    "axios": "^1.2.1",
     "dotenv": "^16.0.3",
     "marklogic": "^2.9.1",
     "rdf-parse": "^2.1.1",

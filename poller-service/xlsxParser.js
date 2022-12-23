@@ -157,6 +157,7 @@ function addTranslatorInterpreter(translatorInterpreter = []) {
     languageOffers.push(`<${offerCatalogItem}> schema:item <${offerUri}> .`)
     languageOffers.push(`<${offerUri}> rdf:type schema:Offer .`)
     languageOffers.push(`<${offerUri}> schema:name "${sanitizedLanguage}" .`);
+    languageOffers.push(`<${offerUri}> schema:offeredBy <${uri}> .`);
   });
 
   const queryRows = [

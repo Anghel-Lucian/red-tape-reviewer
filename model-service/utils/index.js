@@ -1,4 +1,5 @@
 import util from 'util';
+import axios from 'axios';
 
 export function transformOfficeObjectToJsonLd(object) {
   let defaultJson = {
@@ -117,4 +118,26 @@ export const safePromisify = function (fun, methodsArray) {
     methodsArray.forEach(method => {
       fun[method + suffix] = util.promisify(fun[method]);
   });
+}
+
+export async function getCoordinates(address) {
+  const url = 'https://api.mapbox.com/geocoding/v5/mapbox.places/'
+  + encodeURIComponent(address) + '.json?access_token='
+  + process.env.MAP_API_KEY + '&limit=1';
+  const axiosOptions = {
+    url,
+    method: 'GET',
+    headers: {}
+  }
+  const {data} = await axios(axiosOptions);
+
+  if (data?.message || !data.features?.length || !data.features[0].center?.length) {
+    console.log(data);
+    return;
+  }
+
+  return {
+    lng: data.features[0].center[0],
+    lat: data.features[0].center[1]
+  }
 }
