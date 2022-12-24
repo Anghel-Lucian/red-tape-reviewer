@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import marklogic from 'marklogic';
 import { getCoordinates } from '../utils/index.js';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -371,10 +372,136 @@ export default class Office {
         await db.graphs.sparqlUpdate(insertNewAddressQuery);
       }
     }
-
-    return true;
   }
 
-  // TODO: create function for posting reviews
+  static async postReview(userId, officeId, review) {
+    const userExistsQuery = `
+      PREFIX schema: <http://schema.org/>
+
+      ASK { <http://red-tape-reviewer.com/people/${userId}> ?p ?o }
+    `;
+
+    const userExistsQueryResult = await db.graphs.sparql('application/sparql-results+json', userExistsQuery).result();
+
+    if (!userExistsQueryResult.boolean) {
+      return { message: `No user with id ${userId} found. Cancelling review` }
+    }
+
+    const officeExistsQuery = `
+      PREFIX schema: <http://schema.org/>
+
+      ASK { <http://red-tape-reviewer.com/offices/${officeId}> ?p ?o }
+    `;
+
+    const officeExistsQueryResult = await db.graphs.sparql('application/sparql-results+json', officeExistsQuery).result();
+
+    if (!officeExistsQueryResult.boolean) {
+      return { message: `No office with id ${officeId} found. Cancelling review` }
+    }
+
+    if (!review.rating) {
+      return { message: "Review must have a 'rating: number' property" }
+    }
+
+    const officeReviewsUri = `http://red-tape-reviewer.com/reviews/${officeId}`;
+    const officeReviewsItemUri = `${officeReviewsUri}-item`;
+    const reviewUri = `${officeReviewsUri}/${crypto.randomUUID()}`;
+    const officeUri = `http://red-tape-reviewer.com/offices/${officeId}`;
+    const officeAggregateReviewUri = `http://red-tape-reviewer.com/aggregate-reviews/${officeId}`;
+    const userUri = `http://red-tape-reviewer.com/people/${userId}`;
+
+    // insert review
+    const insertReviewQuery = `
+      PREFIX schema: <http://schema.org/>
+      PREFIX rdf: <https://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+      <${reviewUri}> rdf:type schema:Review .
+      <${reviewUri}> schema:reviewRating ${review.reviewRating} .
+      ${review.reviewBody ? `<${reviewUri}> schema:reviewBody "${review.reviewBody}" .` : ''}
+      ${review.reviewAspect ? `<${reviewUri}> schema:reviewAspect "${review.reviewAspect}" .` : ''}
+      <${reviewUri}> schema:author <${userUri}> .
+      <${reviewUri}> schema:itemReviewed <${officeUri}> .
+    `;
+
+    await db.graphs.sparqlUpdate(insertReviewQuery);
+
+    // if no reviews list for office, create it and the aggregateRating property
+    const insertIfNotExistOfficeReviews = `
+      PREFIX schema: <http://schema.org/>
+
+      INSERT { 
+        <${officeUri}> schema:reviews <${officeReviewsUri}> .
+      } 
+      WHERE {
+       FILTER NOT EXISTS { <${officeUri}> schema:reviews ?o } 
+      }
+    `;
+
+    await db.graphs.sparqlUpdate(insertIfNotExistOfficeReviews);
+
+    const insertIfNotExistOfficeAggregateRating = `
+      PREFIX schema: <http://schema.org/>
+
+      INSERT { 
+        <${officeUri}> schema:aggregateRating <${officeAggregateReviewUri}> .
+      } 
+      WHERE {
+        FILTER NOT EXISTS { <${officeUri}> schema:aggregateRating ?o } 
+      }
+    `;
+
+    await db.graphs.sparqlUpdate(insertIfNotExistOfficeAggregateRating);
+
+    const insertReviewInOfficeReviews = `
+      PREFIX schema: <http://schema.org/>
+      
+      INSERT DATA {
+        <${officeReviewsUri}> schema:itemListElement <${officeReviewsItemUri}> .
+        <${officeReviewsItemUri}> schema:item <${reviewUri}> .
+      }
+    `;
+
+    await db.graphs.sparqlUpdate(insertReviewInOfficeReviews);
+
+    // TODO: update aggregate review
+    // TODO: test reviews/review insertion
+
+  }
+
+  // TODO: create function for posting reviews, update selector function as well
 }
 
+// await Office.getOfficeById('aaneiandreea-ramonasuceavaitaliană32150suceava742364955');
+// console.log(await Office.updateOffice({
+//   id: 'aaneiandreea-ramonasuceavaitaliană32150suceava742364955',
+//   // streetAddress: 'Strada 8 Martie',
+//   // openingHours: 'Overriden from backend',
+//   // telephone: 'new telephone from backend',
+//   // addition and modification of offers possible
+//   offerCatalog: [
+//     {
+//       name: 'Italiană',
+//       price: '24.99',
+//       description: 'Traducere si interpretare din si in Italiană'
+//     },
+//     {
+//       name: 'English',
+//       price: '29.00',
+//       description: 'Translation and interpretation from and to English'
+//     },
+//     {
+//       name: 'Chinese',
+//       price: '50.00',
+//       description: 'Translation and interpretation from and to Chinese'
+//     }
+//   ]
+// }))
+console.log(await Office.postReview(
+  'test',
+  'adamadriana-andreeabraşovozuncovasna',
+  {
+    reviewRating: 5,
+    reviewBody: "Very good service",
+    reviewAspect: "Simple..."
+  }
+));
