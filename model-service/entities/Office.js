@@ -232,8 +232,6 @@ export default class Office {
         `;
 
         await db.graphs.sparqlUpdate(insertOfferCatalogQuery);
-      } else { // TODO: delete this debugging else branch
-        console.log("Offer catalog exists");
       }
 
       // for each offerCatalog item in the payload, create or update one
@@ -248,12 +246,11 @@ export default class Office {
         `;
 
         const offerNameExistsQueryResult = await db.graphs.sparql('application/sparql-results+json', offerNameExistsQuery).result();
+        const offerCatalogItemUri = `${offerCatalogUri}-item`;
+        const offerUri = `http://red-tape-reviewer.com/services/${office.id}-${offer.name.toLowerCase()}`;
 
         // if offer doesn't exist create an entirely new offer
         if (!offerNameExistsQueryResult.boolean) {
-          const offerCatalogItemUri = `${offerCatalogUri}-item`;
-          const offerUri = `http://red-tape-reviewer.com/services/${office.id}-${offer.name.toLowerCase()}`;
-
           const insertOfferQuery = `
             PREFIX schema: <http://schema.org/>
             PREFIX rdf: <https://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -270,8 +267,36 @@ export default class Office {
           `;
 
           await db.graphs.sparqlUpdate(insertOfferQuery);
-        } else { // TODO: if offer already exists, add the new attributes to it
-          console.log("offer already exists");
+        } else { // if offer exists, update its properties
+          if (offer.price) {
+            const updateOfferQuery = `
+              PREFIX schema: <http://schema.org/>
+
+              INSERT { 
+                <${offerUri}> schema:price "${offer.price}" .
+              } 
+              WHERE {
+                FILTER NOT EXISTS { <${offerUri}> schema:price ?o } 
+              }
+            `;
+
+            await db.graphs.sparqlUpdate(updateOfferQuery);
+          }
+          
+          if (offer.description) {
+            const updateOfferQuery = `
+              PREFIX schema: <http://schema.org/>
+
+              INSERT { 
+                <${offerUri}> schema:description "${offer.description}" .
+              } 
+              WHERE {
+                FILTER NOT EXISTS { <${offerUri}> schema:description ?o } 
+              }
+            `;
+
+            await db.graphs.sparqlUpdate(updateOfferQuery);
+          }
         }
       });
     }
@@ -353,28 +378,3 @@ export default class Office {
   // TODO: create function for posting reviews
 }
 
-// await Office.getOfficeById('aaneiandreea-ramonasuceavaitaliană32150suceava742364955');
-console.log(await Office.updateOffice({
-  id: 'aaneiandreea-ramonasuceavaitaliană32150suceava742364955',
-  // streetAddress: 'Strada 8 Martie',
-  // openingHours: 'Overriden from backend',
-  // telephone: 'new telephone from backend',
-  // addition and modification of offers possible
-  offerCatalog: [
-    {
-      name: 'Italiană',
-      price: '24.99',
-      description: 'Traducere si interpretare din si in Italiană'
-    },
-    {
-      name: 'English',
-      price: '15.00',
-      description: 'Translation and interpretation from and to English'
-    },
-    {
-      name: 'Chinese',
-      price: '50.00',
-      description: 'Translation and interpretation from and to Chinese'
-    }
-  ]
-}))
