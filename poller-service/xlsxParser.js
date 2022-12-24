@@ -66,6 +66,20 @@ async function addNotary(notaryEntry = []) {
 
   const id = notaryEntry.join('').replaceAll(' ', '').toLowerCase();
   const uri = `http://red-tape-reviewer.com/offices/${id}`;
+
+  const officeExistsQuery = `
+    PREFIX schema: <http://schema.org/>
+
+    ASK { <${uri}> ?p ?o }
+  `;
+
+  const officeExistsQueryResult = await db.graphs.sparql('application/sparql-results+json', officeExistsQuery).result();
+
+  if (officeExistsQueryResult.boolean) {
+    console.log(`[XLSX PARSER]: NOTARY ADDITION CANCELED. ENTRY WITH URI ${uri} EXISTS IN DB.`);
+    return;
+  }
+
   const addressUri = `http://red-tape-reviewer.com/addresses/${id}`;
   const mapUri = `http://red-tape-reviewer.com/maps/${id}`;
   let lng, lat;
@@ -109,7 +123,7 @@ async function addNotary(notaryEntry = []) {
   db.graphs.sparqlUpdate(sparqlQuery);
 }
 
-function addTranslatorInterpreter(translatorInterpreter = []) {
+async function addTranslatorInterpreter(translatorInterpreter = []) {
   let [fullName, courtOfAppeal, languages, authorizationNumber, county, contacts] = translatorInterpreter;
   let [name, firstName, otherFirstName] = fullName?.split(" ");
 
@@ -144,6 +158,20 @@ function addTranslatorInterpreter(translatorInterpreter = []) {
 
   const id = translatorInterpreter.join('').replaceAll(' ', '').toLowerCase();
   const uri = `http://red-tape-reviewer.com/offices/${id}`;
+
+  const officeExistsQuery = `
+    PREFIX schema: <http://schema.org/>
+
+    ASK { <${uri}> ?p ?o }
+  `;
+
+  const officeExistsQueryResult = await db.graphs.sparql('application/sparql-results+json', officeExistsQuery).result();
+
+  if (officeExistsQueryResult.boolean) {
+    console.log(`[XLSX PARSER]: TRANSLATOR-INTERPRETER ADDITION CANCELED. ENTRY WITH URI ${uri} EXISTS IN DB.`);
+    return;
+  }
+
   const addressUri = `http://red-tape-reviewer.com/addresses/${id}`;
   const offerCatalogUri = `http://red-tape-reviewer.com/offers/${id}`;
   let languageOffers = [];
