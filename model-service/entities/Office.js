@@ -399,8 +399,8 @@ export default class Office {
       return { message: `No office with id ${officeId} found. Cancelling review` }
     }
 
-    if (!review.rating) {
-      return { message: "Review must have a 'rating: number' property" }
+    if (!review.reviewRating) {
+      return { message: "Review must have a 'reviewRating: number' property" }
     }
 
     const officeReviewsUri = `http://red-tape-reviewer.com/reviews/${officeId}`;
@@ -415,57 +415,135 @@ export default class Office {
       PREFIX schema: <http://schema.org/>
       PREFIX rdf: <https://www.w3.org/1999/02/22-rdf-syntax-ns#>
 
-      <${reviewUri}> rdf:type schema:Review .
-      <${reviewUri}> schema:reviewRating ${review.reviewRating} .
-      ${review.reviewBody ? `<${reviewUri}> schema:reviewBody "${review.reviewBody}" .` : ''}
-      ${review.reviewAspect ? `<${reviewUri}> schema:reviewAspect "${review.reviewAspect}" .` : ''}
-      <${reviewUri}> schema:author <${userUri}> .
-      <${reviewUri}> schema:itemReviewed <${officeUri}> .
+      INSERT DATA {
+        <${reviewUri}> rdf:type schema:Review .
+        <${reviewUri}> schema:reviewRating ${review.reviewRating} .
+        ${review.reviewBody ? `<${reviewUri}> schema:reviewBody "${review.reviewBody}" .` : ''}
+        ${review.reviewAspect ? `<${reviewUri}> schema:reviewAspect "${review.reviewAspect}" .` : ''}
+        <${reviewUri}> schema:author <${userUri}> .
+        <${reviewUri}> schema:itemReviewed <${officeUri}> .
+      }
     `;
 
     await db.graphs.sparqlUpdate(insertReviewQuery);
 
-    // if no reviews list for office, create it and the aggregateRating property
-    const insertIfNotExistOfficeReviews = `
+    const aggregateRatingExistsQuery = `
       PREFIX schema: <http://schema.org/>
 
-      INSERT { 
-        <${officeUri}> schema:reviews <${officeReviewsUri}> .
-      } 
-      WHERE {
-       FILTER NOT EXISTS { <${officeUri}> schema:reviews ?o } 
-      }
+      ASK { <http://red-tape-reviewer.com/aggregate-reviews/${officeId}> ?p ?o }
     `;
 
-    await db.graphs.sparqlUpdate(insertIfNotExistOfficeReviews);
+    const aggregateRatingExistsQueryResult = await db.graphs.sparql('application/sparql-results+json', aggregateRatingExistsQuery).result();
+    
+    // TODO: aggregate review is not inserted for the first time. Don't know if it updates tho, didn't test. Fix this
 
-    const insertIfNotExistOfficeAggregateRating = `
-      PREFIX schema: <http://schema.org/>
+    // if no reviews list for office, create it, and add the aggregateRating property
+    if (!aggregateRatingExistsQueryResult.boolean) {
+      console.log("Inserting first ever review");
+      const insertReviewOfficeReviewsAggregateRating = `
+        PREFIX schema: <http://schema.org/>
 
-      INSERT { 
-        <${officeUri}> schema:aggregateRating <${officeAggregateReviewUri}> .
-      } 
-      WHERE {
-        FILTER NOT EXISTS { <${officeUri}> schema:aggregateRating ?o } 
+        INSERT DATA {
+          <${officeUri}> schema:reviews <${officeReviewsUri}> .
+          <${officeUri}> schema:aggregateRating <${officeAggregateReviewUri}> .
+          <${officeAggregateReviewUri}> rdf:type schema:AggregateRating .
+          <${officeAggregateReviewUri}> schema:reviewCount 1 .
+          <${officeAggregateReviewUri}> schema:ratingValue ${review.reviewRating} .
+          <${officeAggregateReviewUri}> schema:itemReviewed <${officeUri}> .
+        }
+      `;
+
+      await db.graphs.sparqlUpdate(insertReviewOfficeReviewsAggregateRating);
+    } else { // else, update the aggregateRating property
+      console.log("existing aggregate rating, updating it");
+      const allOfficeReviewsQuery = `
+        PREFIX schema: <http://schema.org/>
+        PREFIX rdf: <https://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        
+        SELECT ?reviewRating WHERE {
+          ?s rdf:type schema:Review .
+          ?s schema:itemReviewed <${officeUri}> .
+          
+          ?s schema:reviewRating ?reviewRating .
+        }
+      `;
+
+      const allOfficeReviewsQueryResult = await db.graphs.sparql('application/sparql-results+json', allOfficeReviewsQuery).result();
+
+      const reviewsRatings = [];
+
+      if (allOfficeReviewsQueryResult && allOfficeReviewsQueryResult.results && allOfficeReviewsQueryResult.results.bindings && allOfficeReviewsQueryResult.results.bindings.length) {
+        allOfficeReviewsQueryResult.results.bindings.forEach(review => {
+          const reviewRating = Number(review.reviewRating.value);
+          reviewsRatings.push(reviewRating);
+        });
       }
-    `;
 
-    await db.graphs.sparqlUpdate(insertIfNotExistOfficeAggregateRating);
+      const reviewsRatingsTotal = reviewsRatings.reduce(prevRating, rating => prevRating + rating, 0);
 
-    const insertReviewInOfficeReviews = `
+      const newAggregateRatingValue = reviewsRatingsTotal / reviewsRatings.length;
+
+      const existingAggregateRatingQuery = `
+        PREFIX schema: <http://schema.org/>
+        PREFIX rdf: <https://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        
+        SELECT ?ratingValue ?reviewCount WHERE {
+          ?s rdf:type schema:AggregateRating .
+          ?s schema:itemReviewed <${officeUri}> .
+          
+          ?s schema:ratingValue ?ratingValue .
+          ?s schema:reviewCount ?reviewCount .
+        }
+      `;
+
+      const existingAggregateRatingQueryResult = await db.graphs.sparql('application/sparql-results+json', existingAggregateRatingQuery).result();
+
+      let existingRatingValue;
+      let existingReviewCount;
+
+      if (existingAggregateRatingQueryResult && existingAggregateRatingQueryResult.results && existingAggregateRatingQueryResult.results.bindings && existingAggregateRatingQueryResult.results.bindings.length) {
+        existingRatingValue = existingAggregateRatingQueryResult.results.bindings[0].ratingValue.value;
+        existingReviewCount = existingAggregateRatingQueryResult.results.bindings[0].reviewCount.value;
+      }
+
+      if (!existingRatingValue || !existingReviewCount) {
+        return { message: 'Error when querying existing aggregate rating. Cancelling' };
+      }
+
+      const deleteExistingAggregateRatingValueCount = `
+        PREFIX schema: <http://schema.org/>
+        
+        DELETE DATA {
+          <${officeAggregateReviewUri}> schema:reviewCount ${Number(existingReviewCount)} .
+          <${officeAggregateReviewUri}> schema:ratingValue ${Number(existingRatingValue)} .
+        }
+      `;
+
+      await db.graphs.sparqlUpdate(deleteExistingAggregateRatingValueCount);
+
+      const insertNewAggregateRatingValueCount = `
+        PREFIX schema: <http://schema.org/>
+          
+        DELETE DATA {
+          <${officeAggregateReviewUri}> schema:reviewCount ${Number(reviewsRatings.length)} .
+          <${officeAggregateReviewUri}> schema:ratingValue ${Number(newAggregateRatingValue)} .
+        }
+      `;
+
+      await db.graphs.sparqlUpdate(insertNewAggregateRatingValueCount);
+    }
+
+    // add review to office reviews list
+    const addReviewToOfficeReviewsQuery = `
       PREFIX schema: <http://schema.org/>
-      
+    
       INSERT DATA {
         <${officeReviewsUri}> schema:itemListElement <${officeReviewsItemUri}> .
         <${officeReviewsItemUri}> schema:item <${reviewUri}> .
       }
     `;
 
-    await db.graphs.sparqlUpdate(insertReviewInOfficeReviews);
-
-    // TODO: update aggregate review
-    // TODO: test reviews/review insertion
-
+    await db.graphs.sparqlUpdate(addReviewToOfficeReviewsQuery);
   }
 
   // TODO: create function for posting reviews, update selector function as well
