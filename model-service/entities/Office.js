@@ -439,9 +439,10 @@ export default class Office {
 
     // if no reviews list for office, create it, and add the aggregateRating property
     if (!aggregateRatingExistsQueryResult.boolean) {
-      console.log("Inserting first ever review");
+      console.log("Inserting first ever aggregate review");
       const insertReviewOfficeReviewsAggregateRating = `
         PREFIX schema: <http://schema.org/>
+        PREFIX rdf: <https://www.w3.org/1999/02/22-rdf-syntax-ns#>
 
         INSERT DATA {
           <${officeUri}> schema:reviews <${officeReviewsUri}> .
@@ -470,7 +471,7 @@ export default class Office {
 
       const allOfficeReviewsQueryResult = await db.graphs.sparql('application/sparql-results+json', allOfficeReviewsQuery).result();
 
-      const reviewsRatings = [];
+      const reviewsRatings = [review.reviewRating];
 
       if (allOfficeReviewsQueryResult && allOfficeReviewsQueryResult.results && allOfficeReviewsQueryResult.results.bindings && allOfficeReviewsQueryResult.results.bindings.length) {
         allOfficeReviewsQueryResult.results.bindings.forEach(review => {
@@ -479,9 +480,9 @@ export default class Office {
         });
       }
 
-      const reviewsRatingsTotal = reviewsRatings.reduce(prevRating, rating => prevRating + rating, 0);
+      const reviewsRatingsTotal = reviewsRatings.reduce((prevRating, rating) => prevRating + rating, 0);
 
-      const newAggregateRatingValue = reviewsRatingsTotal / reviewsRatings.length;
+      const newAggregateRatingValue = Math.ceil(reviewsRatingsTotal / reviewsRatings.length);
 
       const existingAggregateRatingQuery = `
         PREFIX schema: <http://schema.org/>
@@ -506,6 +507,7 @@ export default class Office {
         existingReviewCount = existingAggregateRatingQueryResult.results.bindings[0].reviewCount.value;
       }
 
+      // TODO: are the aggregate reviews properties added correctly?
       if (!existingRatingValue || !existingReviewCount) {
         return { message: 'Error when querying existing aggregate rating. Cancelling' };
       }
@@ -524,7 +526,7 @@ export default class Office {
       const insertNewAggregateRatingValueCount = `
         PREFIX schema: <http://schema.org/>
           
-        DELETE DATA {
+        INSERT DATA {
           <${officeAggregateReviewUri}> schema:reviewCount ${Number(reviewsRatings.length)} .
           <${officeAggregateReviewUri}> schema:ratingValue ${Number(newAggregateRatingValue)} .
         }
@@ -578,8 +580,8 @@ console.log(await Office.postReview(
   'test',
   'adamadriana-andreeabraşovozuncovasna',
   {
-    reviewRating: 5,
-    reviewBody: "Very good service",
+    reviewRating: 1,
+    reviewBody: "Veryy nice",
     reviewAspect: "Simple..."
   }
 ));
