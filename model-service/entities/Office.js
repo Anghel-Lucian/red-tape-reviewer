@@ -32,12 +32,21 @@ export default class Office {
       PREFIX schema: <http://schema.org/>
       PREFIX rdf: <https://www.w3.org/1999/02/22-rdf-syntax-ns#>
       
-      SELECT ?name ?type ?telephone ?openingHours ?addressRegion ?streetAddress ?longitude ?latitude ?mapHostUrl ?offerCatalog WHERE { 
+      SELECT ?name ?type ?id ?telephone ?aggregateRating ?reviews ?openingHours ?addressRegion ?streetAddress ?longitude ?latitude ?mapHostUrl ?offerCatalog WHERE { 
         ?s schema:name ?name .
         ?s rdf:type ?type .
+        ?s schema:identifier ?id .
       
         OPTIONAL {
           ?s schema:telephone ?telephone .
+        }
+
+        OPTIONAL {
+          ?s schema:aggregateRating ?aggregateRating .
+        }
+        
+        OPTIONAL {
+          ?s schema:reviews ?reviews .
         }
 
         OPTIONAL {
@@ -145,12 +154,81 @@ export default class Office {
       }
     }
 
-    // TODO: handle reviews and aggregate rating
-    console.log(officeData);
+    if (officeData.aggregateRating) {
+      const aggregateRatingQuery = `
+        PREFIX schema: <http://schema.org/>
+        PREFIX rdf: <https://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+        SELECT ?ratingValue ?reviewCount WHERE {
+          ?s rdf:type schema:AggregateRating .
+          ?s schema:itemReviewed <http://red-tape-reviewer.com/offices/adamadriana-andreeabraşovozuncovasna> .
+          
+          ?s schema:ratingValue ?ratingValue .
+          ?s schema:reviewCount ?reviewCount .
+        }
+      `;
+
+      const aggregateRating = await db.graphs.sparql('application/sparql-results+json', aggregateRatingQuery).result();
+
+      if (aggregateRating || aggregateRating.results || aggregateRating.results.bindings || aggregateRating.results.bindings.length) {
+        officeData.aggregateRating = {
+          ratingValue: aggregateRating.results.bindings[0].ratingValue.value,
+          reviewCount: aggregateRating.results.bindings[0].reviewCount.value,
+        };
+      }
+    }
+
+    if (officeData.reviews) {
+      const reviewsQuery = `
+        PREFIX schema: <http://schema.org/>
+        PREFIX rdf: <https://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+        SELECT ?author ?reviewBody ?reviewAspect ?reviewRating WHERE {
+          ?s rdf:type schema:Review .
+          ?s schema:itemReviewed <http://red-tape-reviewer.com/offices/adamadriana-andreeabraşovozuncovasna> .
+          
+          ?s schema:reviewRating ?reviewRating .
+          ?s schema:author ?author .
+          
+          OPTIONAL {
+            ?s schema:reviewBody ?reviewBody .    
+          }
+          
+          OPTIONAL {
+            ?s schema:reviewAspect ?reviewAspect .    
+          }
+        }
+      `;
+
+      const reviews = await db.graphs.sparql('application/sparql-results+json', reviewsQuery).result();
+
+      let reviewsData = [];
+
+      if (reviews || reviews.results || reviews.results.bindings || reviews.results.bindings.length) {
+        reviews.results.bindings.forEach(review => {
+          const reviewObj = Object.entries(review).reduce((prevObj, [key, {value}]) => {
+            if (!value) {
+              return;
+            }
+
+            return {
+              ...prevObj,
+              [key]: value
+            }
+          }, {})
+
+          reviewsData.push(reviewObj);
+        });
+
+        officeData.reviews = reviewsData;
+      }
+    }
+
     return officeData;
   }
 
   static async getOfficesFiltered(filters) {
+    // filters.page
     // filters.addressRegion
     // filters.reviewValue
     // filters.reviewCount
@@ -165,6 +243,57 @@ export default class Office {
     // }
     
 
+  }
+
+  static async getOfficesPaginated(page) {
+    let results = [];
+
+    const queryNotaries = `
+      PREFIX schema: <http://schema.org/>
+      PREFIX rdf: <https://www.w3.org/1999/02/22-rdf-syntax-ns#>
+      
+      SELECT ?s ?id WHERE {  
+        ?s rdf:type schema:Notary .    
+        ?s schema:identifier ?id .
+      } OFFSET ${page ? page / 2 * 10 : 0} LIMIT ${page ? '100000000' : '10'}
+    `;
+
+    const queryTranslatorsInterpreters = `
+      PREFIX schema: <http://schema.org/>
+      PREFIX rdf: <https://www.w3.org/1999/02/22-rdf-syntax-ns#>
+      
+      SELECT ?s ?id WHERE {  
+        ?s rdf:type schema:LocalBusiness .    
+        ?s schema:identifier ?id .
+      } OFFSET ${page ? page / 2 * 10 : 0} LIMIT ${page ? '100000000' : '10'}
+    `;
+
+    const notaries = await db.graphs.sparql('application/sparql-results+json', queryNotaries).result();
+    const translatorsInterpreters = await db.graphs.sparql('application/sparql-results+json', queryTranslatorsInterpreters).result();
+    const officeIds = [];
+
+    if (notaries || notaries.results || notaries.results.bindings || notaries.results.bindings.length) {
+      notaries.results.bindings.forEach(async (notary) => {
+        officeIds.push(notary.id.value);
+      });
+    }
+
+    if (translatorsInterpreters || translatorsInterpreters.results || translatorsInterpreters.results.bindings || translatorsInterpreters.results.bindings.length) {
+      translatorsInterpreters.results.bindings.forEach(async (translatorInterpreter) => {
+        officeIds.push(translatorInterpreter.id.value);
+      });
+    }
+
+    for (let i = 0; i < officeIds.length; i++) {
+      const office = await this.getOfficeById(officeIds[i]);
+
+      results.push(office);
+
+      if (i == officeIds.length - 1) {
+        console.log(results);
+        return results;
+      }
+    }
   }
 
   static async updateOffice(office) {
@@ -435,8 +564,6 @@ export default class Office {
 
     const aggregateRatingExistsQueryResult = await db.graphs.sparql('application/sparql-results+json', aggregateRatingExistsQuery).result();
     
-    // TODO: aggregate review is not inserted for the first time. Don't know if it updates tho, didn't test. Fix this
-
     // if no reviews list for office, create it, and add the aggregateRating property
     if (!aggregateRatingExistsQueryResult.boolean) {
       console.log("Inserting first ever aggregate review");
@@ -507,7 +634,6 @@ export default class Office {
         existingReviewCount = existingAggregateRatingQueryResult.results.bindings[0].reviewCount.value;
       }
 
-      // TODO: are the aggregate reviews properties added correctly?
       if (!existingRatingValue || !existingReviewCount) {
         return { message: 'Error when querying existing aggregate rating. Cancelling' };
       }
@@ -548,40 +674,5 @@ export default class Office {
     await db.graphs.sparqlUpdate(addReviewToOfficeReviewsQuery);
   }
 
-  // TODO: create function for posting reviews, update selector function as well
+  // TODO: create function for selecting reviews by filtering
 }
-
-// await Office.getOfficeById('aaneiandreea-ramonasuceavaitaliană32150suceava742364955');
-// console.log(await Office.updateOffice({
-//   id: 'aaneiandreea-ramonasuceavaitaliană32150suceava742364955',
-//   // streetAddress: 'Strada 8 Martie',
-//   // openingHours: 'Overriden from backend',
-//   // telephone: 'new telephone from backend',
-//   // addition and modification of offers possible
-//   offerCatalog: [
-//     {
-//       name: 'Italiană',
-//       price: '24.99',
-//       description: 'Traducere si interpretare din si in Italiană'
-//     },
-//     {
-//       name: 'English',
-//       price: '29.00',
-//       description: 'Translation and interpretation from and to English'
-//     },
-//     {
-//       name: 'Chinese',
-//       price: '50.00',
-//       description: 'Translation and interpretation from and to Chinese'
-//     }
-//   ]
-// }))
-console.log(await Office.postReview(
-  'test',
-  'adamadriana-andreeabraşovozuncovasna',
-  {
-    reviewRating: 1,
-    reviewBody: "Veryy nice",
-    reviewAspect: "Simple..."
-  }
-));
