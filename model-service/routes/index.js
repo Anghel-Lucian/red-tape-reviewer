@@ -1,9 +1,11 @@
-import Office from '../entities/Office.js';
+import Handlers from '../handlers.js';
 import {transformOfficeObjectToJsonLd} from '../utils/index.js';
 
+// TODO: use JSON-LD for stuff that will go to the client app
+// TODO: expose each thing by its own URI (take reviews as example)
 export const routes = {
-  office: async function(data, res) {
-    if (data.method === 'get') {
+  offices: async function(data, res) {
+    if (data.method == 'get') {
       if (Object.keys(data.queryString).length == 0) {
         const payload = {
           message: "Expected parameters",
@@ -37,14 +39,14 @@ export const routes = {
       }
 
       if (data.queryString.id) {  
-        const payload = await Office.getOfficeById(data.queryString.id);
+        const payload = await Handlers.getOfficeById(data.queryString.id);
 
         if (!payload) {
-          const payload = {
+          const payloadMessage = {
             message: `No entity found with [id]: ${data.queryString.id}`,
             code: 200
           }
-          const payloadStr = JSON.stringify(payload);
+          const payloadStr = JSON.stringify(payloadMessage);
           res.setHeader("Content-Type", "application/json");
           res.setHeader("Access-Control-Allow-Origin", "*");
           res.writeHead(200);
@@ -55,7 +57,8 @@ export const routes = {
           return;
         }
 
-        const jsonldPayload = transformOfficeObjectToJsonLd(payload);
+        // TODO: const jsonldPayload = transformOfficeObjectToJsonLd(payload);
+        const jsonldPayload = payload;
 
         const payloadStr = JSON.stringify(jsonldPayload);
         res.setHeader("Content-Type", "application/ld+json");
@@ -67,7 +70,42 @@ export const routes = {
 
         return;
       }
-    } else if (data.method === 'put') {
+
+
+      if (Object.keys(data.queryString).length === 1 && data.queryString.page) {
+        const payload = await Handlers.getOfficesPaginated(data.queryString.page);
+
+        if (!payload) {
+          const payloadMessage = {
+            message: "No entities found",
+            code: 404
+          };
+          const payloadStr = JSON.stringify(payloadMessage);
+          res.setHeader("Content-Type", "application/json");
+          res.setHeader("Access-Control-Allow-Origin", "*");
+          res.writeHead(404);
+
+          res.write(payloadStr);
+          res.end("\n");
+
+          return;
+        } 
+
+        // TODO: this payload is array
+        // const jsonldPayload = transformOfficeObjectToJsonLd(payload);
+        const jsonldPayload = payload;
+
+        const payloadStr = JSON.stringify(jsonldPayload);
+        res.setHeader("Content-Type", "application/ld+json");
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.writeHead(200);
+
+        res.write(payloadStr);
+        res.end("\n");
+
+        return;
+      }
+    } else if (data.method == 'put') {
       if (!data.requestPayload || Object.values(data.requestPayload).length === 0) {
         const payload = {
           message: "PUT request must have body",
@@ -100,13 +138,30 @@ export const routes = {
         return;
       }
 
-    // TODO: use transform jsonld to object after figuring out reviews and services
+      const updatePayload = {
+        id: data.requestPayload['@id'],
+        ...data.requestPayload.streetAddress ? {streetAddress: data.requestPayload.streetAddress} : {},
+        ...data.requestPayload.openingHours ? {openingHours: data.requestPayload.openingHours} : {},
+        ...data.requestPayload.telephone ? {telephone: data.requestPayload.telephone} : {}
+      }
 
-      const isEntity = await Office.updateOffice(data.requestPayload);
+      if (data.requestPayload.hasOfferCatalog) {
+        updatePayload.offerCatalog = [];
 
-      if (!isEntity) {
+        data.requestPayload.hasOfferCatalog.itemListElement.forEach(item => {
+          updatePayload.offerCatalog.push({
+            name: item.name,
+            ...item.price ? {price: item.price} : {},
+            ...item.description ? {description: item.description} : {}
+          });
+        })
+      }
+
+      const response = await Handlers.updateOffice(updatePayload);
+
+      if (response?.message) {
         const payload = {
-          message: `No item with [@id]: ${data.requestPayload['@id']} found`,
+          message: response.message,
           code: 400
         };
         const payloadStr = JSON.stringify(payload);
@@ -122,6 +177,81 @@ export const routes = {
 
       const payload = {
         message: "Entity updated",
+        code: 200
+      };
+      const payloadStr = JSON.stringify(payload);
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.writeHead(200);
+
+      res.write(payloadStr);
+      res.end("\n");
+
+      return;
+    }
+  },
+  reviews: async function(data, res) {
+    if (data.method == 'post') {
+      if (!data.requestPayload['itemReviewed'] || !data.requestPayload['author'] || !data.requestPayload['reviewRating']) {
+        const payload = {
+          message: "Request body must have at least: [itemReviewed], [author] and [reviewRating] fields",
+          code: 400
+        };
+        const payloadStr = JSON.stringify(payload);
+        res.setHeader("Content-Type", "application/json");
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.writeHead(400);
+  
+        res.write(payloadStr);
+        res.end("\n");
+  
+        return;
+      }
+
+      const userId = data.requestPayload.author.slice(data.requestPayload.author.lastIndexOf('/') + 1);
+      const officeId = data.requestPayload.itemReviewed.slice(data.requestPayload.itemReviewed.lastIndexOf('/') + 1);
+      const reviewBody = {
+        reviewRating: data.requestPayload.reviewRating,
+        ...data.requestPayload.reviewBody ? {reviewBody: data.requestPayload.reviewBody} : {},
+        ...data.requestPayload.reviewAspect ? {reviewAspect: data.requestPayload.reviewAspect} : {}
+      };
+
+      const response = await Handlers.postReview(userId, officeId, reviewBody);
+
+      if (response?.message) {
+        const payload = {
+          message: response.message,
+          code: 400
+        };
+        const payloadStr = JSON.stringify(payload);
+        res.setHeader("Content-Type", "application/json");
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.writeHead(400);
+  
+        res.write(payloadStr);
+        res.end("\n");
+  
+        return;
+      }
+
+      const payload = {
+        message: "Reviewed successfully",
+        code: 200
+      };
+      const payloadStr = JSON.stringify(payload);
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.writeHead(200);
+
+      res.write(payloadStr);
+      res.end("\n");
+
+      return;
+    } else if (data.method == 'get' && data.resourceId) {
+      const thing = await Handlers.getThing(`http://red-tape-reviewer.com/reviews/${data.resourceId}`);
+
+      const payload = {
+        thing,
         code: 200
       };
       const payloadStr = JSON.stringify(payload);

@@ -64,7 +64,7 @@ async function addNotary(notaryEntry = []) {
     county = undefined;
   }
 
-  const id = notaryEntry.join('').replaceAll(' ', '').toLowerCase();
+  const id = notaryEntry.join('').replaceAll(' ', '').toLowerCase().replaceAll('/', '');
   const uri = `http://red-tape-reviewer.com/offices/${id}`;
 
   const officeExistsQuery = `
@@ -156,7 +156,7 @@ async function addTranslatorInterpreter(translatorInterpreter = []) {
     languages = languages.split(",")
   }
 
-  const id = translatorInterpreter.join('').replaceAll(' ', '').toLowerCase();
+  const id = translatorInterpreter.join('').replaceAll(' ', '').toLowerCase().replaceAll('/', '');
   const uri = `http://red-tape-reviewer.com/offices/${id}`;
 
   const officeExistsQuery = `

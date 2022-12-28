@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import marklogic from 'marklogic';
-import { getCoordinates } from '../utils/index.js';
+import { getCoordinates } from './utils/index.js';
 import crypto from 'crypto';
 
 dotenv.config();
@@ -14,7 +14,7 @@ const db = marklogic.createDatabaseClient({
   authType: process.env.DB_AUTH_TYPE
 })
 
-export default class Office {
+export default class Handlers {
   constructor(object) {
     this.id = object.id;
     this.averageRating = object.averageRating;
@@ -161,7 +161,7 @@ export default class Office {
 
         SELECT ?ratingValue ?reviewCount WHERE {
           ?s rdf:type schema:AggregateRating .
-          ?s schema:itemReviewed <http://red-tape-reviewer.com/offices/adamadriana-andreeabraşovozuncovasna> .
+          ?s schema:itemReviewed <http://red-tape-reviewer.com/offices/${officeData.id}> .
           
           ?s schema:ratingValue ?ratingValue .
           ?s schema:reviewCount ?reviewCount .
@@ -170,7 +170,7 @@ export default class Office {
 
       const aggregateRating = await db.graphs.sparql('application/sparql-results+json', aggregateRatingQuery).result();
 
-      if (aggregateRating || aggregateRating.results || aggregateRating.results.bindings || aggregateRating.results.bindings.length) {
+      if (aggregateRating && aggregateRating.results && aggregateRating.results.bindings && aggregateRating.results.bindings.length) {
         officeData.aggregateRating = {
           ratingValue: aggregateRating.results.bindings[0].ratingValue.value,
           reviewCount: aggregateRating.results.bindings[0].reviewCount.value,
@@ -185,7 +185,7 @@ export default class Office {
 
         SELECT ?author ?reviewBody ?reviewAspect ?reviewRating WHERE {
           ?s rdf:type schema:Review .
-          ?s schema:itemReviewed <http://red-tape-reviewer.com/offices/adamadriana-andreeabraşovozuncovasna> .
+          ?s schema:itemReviewed <http://red-tape-reviewer.com/offices/${officeData.id}> .
           
           ?s schema:reviewRating ?reviewRating .
           ?s schema:author ?author .
@@ -204,7 +204,7 @@ export default class Office {
 
       let reviewsData = [];
 
-      if (reviews || reviews.results || reviews.results.bindings || reviews.results.bindings.length) {
+      if (reviews && reviews.results && reviews.results.bindings && reviews.results.bindings.length) {
         reviews.results.bindings.forEach(review => {
           const reviewObj = Object.entries(review).reduce((prevObj, [key, {value}]) => {
             if (!value) {
@@ -221,6 +221,7 @@ export default class Office {
         });
 
         officeData.reviews = reviewsData;
+
       }
     }
 
@@ -255,7 +256,7 @@ export default class Office {
       SELECT ?s ?id WHERE {  
         ?s rdf:type schema:Notary .    
         ?s schema:identifier ?id .
-      } OFFSET ${page ? page / 2 * 10 : 0} LIMIT ${page ? '100000000' : '10'}
+      } LIMIT ${page ? (page * 10) / 2 : 10}
     `;
 
     const queryTranslatorsInterpreters = `
@@ -265,7 +266,7 @@ export default class Office {
       SELECT ?s ?id WHERE {  
         ?s rdf:type schema:LocalBusiness .    
         ?s schema:identifier ?id .
-      } OFFSET ${page ? page / 2 * 10 : 0} LIMIT ${page ? '100000000' : '10'}
+      } LIMIT ${page ? (page * 10) / 2 : 10}
     `;
 
     const notaries = await db.graphs.sparql('application/sparql-results+json', queryNotaries).result();
@@ -290,7 +291,6 @@ export default class Office {
       results.push(office);
 
       if (i == officeIds.length - 1) {
-        console.log(results);
         return results;
       }
     }
@@ -298,7 +298,7 @@ export default class Office {
 
   static async updateOffice(office) {
     if (!office.id) {
-      return { message: "office parameter must contain 'id' field" };
+      return { message: "payload must contain 'id' field" };
     }
 
     const askQuery = `
@@ -343,18 +343,18 @@ export default class Office {
 
     if (office.offerCatalog?.length) {
       const offerCatalogExistsQuery = `
-        PREFIX schema: <http://schema.org>
+        PREFIX schema: <http://schema.org/>
 
         ASK { <http://red-tape-reviewer.com/offers/${office.id}> ?p ?o }
       `;
 
       const offerCatalogExistsQueryResult = await db.graphs.sparql('application/sparql-results+json', offerCatalogExistsQuery).result();
-      const offerCatalogUri = `http://red-tape-reviewer.com/offers/${office.id}`
+      const offerCatalogUri = `http://red-tape-reviewer.com/offers/${office.id}`;
 
       // if offer catalog doesn't exist, create one
       if (!offerCatalogExistsQueryResult.boolean) {
         const insertOfferCatalogQuery = `
-          PREFIX schema: <http://schema.org>
+          PREFIX schema: <http://schema.org/>
 
           INSERT DATA {
             <http://red-tape-reviewer.com/offices/${office.id}> schema:hasOfferCatalog <${offerCatalogUri}> .
@@ -377,7 +377,7 @@ export default class Office {
 
         const offerNameExistsQueryResult = await db.graphs.sparql('application/sparql-results+json', offerNameExistsQuery).result();
         const offerCatalogItemUri = `${offerCatalogUri}-item`;
-        const offerUri = `http://red-tape-reviewer.com/services/${office.id}-${offer.name.toLowerCase()}`;
+        const offerUri = `http://red-tape-reviewer.com/services/${office.id}-${offer.name.toLowerCase().replaceAll(" ", "_")}`;
 
         // if offer doesn't exist create an entirely new offer
         if (!offerNameExistsQueryResult.boolean) {
@@ -566,7 +566,6 @@ export default class Office {
     
     // if no reviews list for office, create it, and add the aggregateRating property
     if (!aggregateRatingExistsQueryResult.boolean) {
-      console.log("Inserting first ever aggregate review");
       const insertReviewOfficeReviewsAggregateRating = `
         PREFIX schema: <http://schema.org/>
         PREFIX rdf: <https://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -583,7 +582,6 @@ export default class Office {
 
       await db.graphs.sparqlUpdate(insertReviewOfficeReviewsAggregateRating);
     } else { // else, update the aggregateRating property
-      console.log("existing aggregate rating, updating it");
       const allOfficeReviewsQuery = `
         PREFIX schema: <http://schema.org/>
         PREFIX rdf: <https://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -674,5 +672,21 @@ export default class Office {
     await db.graphs.sparqlUpdate(addReviewToOfficeReviewsQuery);
   }
 
-  // TODO: create function for selecting reviews by filtering
+  static async getThing(uri) {
+    const query = `
+      SELECT * WHERE {
+        <${uri}> ?p ?o .
+      }
+    `;
+
+    const queryResult = await db.graphs.sparql('application/sparql-results+json', query).result();
+    
+    if (queryResult && queryResult.results && queryResult.results.bindings && queryResult.results.bindings.length) {
+      return queryResult.results.bindings;
+    }
+
+    return { message: `No Thing with uri ${uri} found` };
+  }
+
+  // TODO: create function for selecting by filtering
 }

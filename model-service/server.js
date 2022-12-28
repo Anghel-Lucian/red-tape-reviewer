@@ -24,13 +24,33 @@ const server = http.createServer(function(req, res) {
     }
 
     console.log(`[SENDING RESPONSE: ${path} | ${method}]`);
-    const route = typeof routes[path] !== "undefined" ? routes[path] : routes["notFound"];
+    let route = routes["notFound"];
+    let resourceIdParam;
+
+    if (typeof routes[path] !== "undefined") {
+      route = routes[path];
+    } else {
+      let firstPath = path.slice(0, path.lastIndexOf("/"));
+      let resourceId = path.slice(path.lastIndexOf("/") + 1);
+
+      if (firstPath.includes("/")) {
+        resourceId = firstPath.slice(firstPath.lastIndexOf("/") + 1) + "/" + resourceId;
+        firstPath = firstPath.slice(0, firstPath.lastIndexOf("/"));
+      }
+
+      if (typeof routes[firstPath] !== "undefined") {
+        route = routes[firstPath];
+        resourceIdParam = decodeURI(resourceId);
+      }
+    }
+
     const data = {
       path,
       queryString,
       headers,
       method,
-      requestPayload: payload
+      requestPayload: payload,
+      ...resourceIdParam ? {resourceId: resourceIdParam} : {}
     };
 
     route(data, res);
