@@ -7,11 +7,7 @@ export const routes = {
       if (data.resourceId) {
         const thing = await Handlers.getThing(`http://red-tape-reviewer.com/offices/${data.resourceId}`);
 
-        const payload = {
-          thing: transformOfficeObjectToJsonLd(thing),
-          code: 200
-        };
-        const payloadStr = JSON.stringify(payload);
+        const payloadStr = JSON.stringify(thing);
         res.setHeader("Content-Type", "application/json");
         res.setHeader("Access-Control-Allow-Origin", "*");
         res.writeHead(200);
@@ -309,11 +305,7 @@ export const routes = {
     } else if (data.method == 'get' && data.resourceId) {
       const thing = await Handlers.getThing(`http://red-tape-reviewer.com/reviews/${data.resourceId}`);
 
-      const payload = {
-        thing,
-        code: 200
-      };
-      const payloadStr = JSON.stringify(payload);
+      const payloadStr = JSON.stringify(thing);
       res.setHeader("Content-Type", "application/json");
       res.setHeader("Access-Control-Allow-Origin", "*");
       res.writeHead(200);
@@ -328,11 +320,7 @@ export const routes = {
     if (data.method == 'get' && data.resourceId) {
       const thing = await Handlers.getThing(`http://red-tape-reviewer.com/addresses/${data.resourceId}`);
 
-      const payload = {
-        thing,
-        code: 200
-      };
-      const payloadStr = JSON.stringify(payload);
+      const payloadStr = JSON.stringify(thing);
       res.setHeader("Content-Type", "application/json");
       res.setHeader("Access-Control-Allow-Origin", "*");
       res.writeHead(200);
@@ -347,11 +335,7 @@ export const routes = {
     if (data.method == 'get' && data.resourceId) {
       const thing = await Handlers.getThing(`http://red-tape-reviewer.com/maps/${data.resourceId}`);
 
-      const payload = {
-        thing,
-        code: 200
-      };
-      const payloadStr = JSON.stringify(payload);
+      const payloadStr = JSON.stringify(thing);
       res.setHeader("Content-Type", "application/json");
       res.setHeader("Access-Control-Allow-Origin", "*");
       res.writeHead(200);
@@ -366,11 +350,7 @@ export const routes = {
     if (data.method == 'get' && data.resourceId) {
       const thing = await Handlers.getThing(`http://red-tape-reviewer.com/offers/${data.resourceId}`);
 
-      const payload = {
-        thing,
-        code: 200
-      };
-      const payloadStr = JSON.stringify(payload);
+      const payloadStr = JSON.stringify(thing);
       res.setHeader("Content-Type", "application/json");
       res.setHeader("Access-Control-Allow-Origin", "*");
       res.writeHead(200);
@@ -385,11 +365,7 @@ export const routes = {
     if (data.method == 'get' && data.resourceId) {
       const thing = await Handlers.getThing(`http://red-tape-reviewer.com/services/${data.resourceId}`);
 
-      const payload = {
-        thing,
-        code: 200
-      };
-      const payloadStr = JSON.stringify(payload);
+      const payloadStr = JSON.stringify(thing);
       res.setHeader("Content-Type", "application/json");
       res.setHeader("Access-Control-Allow-Origin", "*");
       res.writeHead(200);
@@ -404,11 +380,7 @@ export const routes = {
     if (data.method == 'get' && data.resourceId) {
       const thing = await Handlers.getThing(`http://red-tape-reviewer.com/aggregate-reviews/${data.resourceId}`);
 
-      const payload = {
-        thing,
-        code: 200
-      };
-      const payloadStr = JSON.stringify(payload);
+      const payloadStr = JSON.stringify(thing);
       res.setHeader("Content-Type", "application/json");
       res.setHeader("Access-Control-Allow-Origin", "*");
       res.writeHead(200);
@@ -423,11 +395,7 @@ export const routes = {
     if (data.method == 'get' && data.resourceId) {
       const thing = await Handlers.getThing(`http://red-tape-reviewer.com/resource/${data.resourceId}`);
 
-      const payload = {
-        thing,
-        code: 200
-      };
-      const payloadStr = JSON.stringify(payload);
+      const payloadStr = JSON.stringify(thing);
       res.setHeader("Content-Type", "application/json");
       res.setHeader("Access-Control-Allow-Origin", "*");
       res.writeHead(200);
@@ -476,11 +444,7 @@ export const routes = {
 
       const result = await Handlers.arbitraryQuery(data.queryString.query);
 
-      const payload = {
-        result,
-        code: 200
-      };
-      const payloadStr = JSON.stringify(payload);
+      const payloadStr = JSON.stringify(result);
       res.setHeader("Content-Type", "application/json");
       res.setHeader("Access-Control-Allow-Origin", "*");
       res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");

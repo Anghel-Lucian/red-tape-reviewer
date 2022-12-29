@@ -329,6 +329,8 @@ export default class Handlers {
         return results;
       }
     }
+
+    return [];
   }
 
   static async updateOffice(office) {
@@ -730,6 +732,6 @@ export default class Handlers {
       return queryResult.results.bindings;
     }
 
-    return {bindings: []};
+    return [];
   }
 }
