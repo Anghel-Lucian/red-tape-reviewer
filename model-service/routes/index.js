@@ -1,8 +1,7 @@
 import Handlers from '../handlers.js';
 import {transformOfficeObjectToJsonLd} from '../utils/index.js';
 
-// TODO: use JSON-LD for stuff that will go to the client app
-// TODO: expose each thing by its own URI (take reviews as example)
+// TODO: expose sparql endpoint for querying the data of the app
 export const routes = {
   offices: async function(data, res) {
     if (data.method == 'get') {
@@ -10,7 +9,7 @@ export const routes = {
         const thing = await Handlers.getThing(`http://red-tape-reviewer.com/offices/${data.resourceId}`);
 
         const payload = {
-          thing,
+          thing: transformOfficeObjectToJsonLd(thing),
           code: 200
         };
         const payloadStr = JSON.stringify(payload);
@@ -75,8 +74,7 @@ export const routes = {
           return;
         }
 
-        // TODO: const jsonldPayload = transformOfficeObjectToJsonLd(payload);
-        const jsonldPayload = payload;
+        const jsonldPayload = transformOfficeObjectToJsonLd(payload);
 
         const payloadStr = JSON.stringify(jsonldPayload);
         res.setHeader("Content-Type", "application/ld+json");
@@ -109,9 +107,9 @@ export const routes = {
           return;
         } 
 
-        // TODO: this payload is array
-        // const jsonldPayload = transformOfficeObjectToJsonLd(payload);
-        const jsonldPayload = payload;
+        const jsonldPayload = payload.map(office => {
+          return transformOfficeObjectToJsonLd(office);
+        })
 
         const payloadStr = JSON.stringify(jsonldPayload);
         res.setHeader("Content-Type", "application/ld+json");
@@ -396,6 +394,75 @@ export const routes = {
 
       return;
     }
+  },
+  sparql: async function(data, res) {
+    if (data.method == 'get') {
+      if (!data.queryString['default-graph-uri'] || data.queryString['default-graph-uri'] !== 'http://red-tape-reviewer.com') {
+        const payload = {
+          message: "Must specify [default-graph-uri] parameter. Existing graphs: [http://red-tape-reviewer.com]",
+          code: 400
+        };
+        const payloadStr = JSON.stringify(payload);
+        res.setHeader("Content-Type", "application/json");
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+        res.writeHead(400);
+    
+        res.write(payloadStr);
+        res.end("\n");
+    
+        return;
+      }
+
+      if (!data.queryString.query) {
+        const payload = {
+          message: "Must specify [query] parameter",
+          code: 400
+        };
+        const payloadStr = JSON.stringify(payload);
+        res.setHeader("Content-Type", "application/json");
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+        res.writeHead(400);
+    
+        res.write(payloadStr);
+        res.end("\n");
+    
+        return;
+      }
+
+      const result = await Handlers.arbitraryQuery(data.queryString.query);
+
+      const payload = {
+        result,
+        code: 200
+      };
+      const payloadStr = JSON.stringify(payload);
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+      res.writeHead(200);
+  
+      res.write(payloadStr);
+      res.end("\n");
+  
+      return;
+    }
+
+    const payload = {
+      message: "Only GET requests are allowed for this SPARQL endpoint",
+      code: 400
+    };
+    const payloadStr = JSON.stringify(payload);
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.writeHead(400);
+
+    res.write(payloadStr);
+    res.end("\n");
+
+    return;
   },
   notFound: function(data, res) {
     let payload = {

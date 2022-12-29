@@ -688,5 +688,15 @@ export default class Handlers {
     return { message: `No Thing with uri ${uri} found` };
   }
 
+  static async arbitraryQuery(query) {
+    const queryResult = await db.graphs.sparql('application/sparql-results+json', query).result();
+    
+    if (queryResult && queryResult.results && queryResult.results.bindings && queryResult.results.bindings.length) {
+      return queryResult.results.bindings;
+    }
+
+    return {bindings: []};
+  }
+
   // TODO: create function for selecting by filtering
 }
