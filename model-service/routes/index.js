@@ -1,7 +1,6 @@
 import Handlers from '../handlers.js';
 import {transformOfficeObjectToJsonLd} from '../utils/index.js';
 
-// TODO: expose sparql endpoint for querying the data of the app
 export const routes = {
   offices: async function(data, res) {
     if (data.method == 'get') {
@@ -107,6 +106,50 @@ export const routes = {
           return;
         } 
 
+        const jsonldPayload = payload.map(office => {
+          return transformOfficeObjectToJsonLd(office);
+        })
+
+        const payloadStr = JSON.stringify(jsonldPayload);
+        res.setHeader("Content-Type", "application/ld+json");
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.writeHead(200);
+
+        res.write(payloadStr);
+        res.end("\n");
+
+        return;
+      }
+
+      if (Object.keys(data.queryString).length > 1) {
+        const filters = {
+          ...data.queryString ? {name: data.queryString.name} : {},
+          ...data.queryString ? {addressRegion: data.queryString.addressRegion} : {},
+          ...data.queryString ? {streetAddress: data.queryString.streetAddress} : {},
+          ...data.queryString ? {type: data.queryString.type} : {},
+          ...data.queryString ? {reviewCount: Number(data.queryString.reviewCount)} : {},
+          ...data.queryString ? {ratingValue: Number(data.queryString.ratingValue)} : {},
+          ...data.queryString ? {page: Number(data.queryString.page)} : {},
+        }
+
+        if (Object.values(filters).length === 0) {
+          const payloadMessage = {
+            message: "No relevant parameters found. If you want to filter try ?name: string, ?addressRegion: string, ?streetAddress: string, ?type: string, ?reviewCount: number, ?ratingValue: number, ?page: number.",
+            code: 400
+          };
+          const payloadStr = JSON.stringify(payloadMessage);
+          res.setHeader("Content-Type", "application/json");
+          res.setHeader("Access-Control-Allow-Origin", "*");
+          res.writeHead(400);
+
+          res.write(payloadStr);
+          res.end("\n");
+
+          return;
+        }
+
+        const payload = await Handlers.getOfficesFiltered(filters);
+       
         const jsonldPayload = payload.map(office => {
           return transformOfficeObjectToJsonLd(office);
         })

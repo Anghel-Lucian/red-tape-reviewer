@@ -229,21 +229,56 @@ export default class Handlers {
   }
 
   static async getOfficesFiltered(filters) {
-    // filters.page
-    // filters.addressRegion
-    // filters.reviewValue
-    // filters.reviewCount
-    // filters.type
-    // filters.languages
-    // filters.services
-    // const parameters = {
-    //   TableName: process.env.OFFICES_TABLE,
-    //   Key: {
-    //     OfficeId: {S: officeId}
-    //   }
-    // }
-    
+    // TODO: filtering by services
+    /*
+      filters.name: string
+      filters.addressRegion: string
+      filters.streetAddress: string
+      filters.type: string
+      filters.reviewCount: number
+      filters.ratingValue: number
+      filters.page: number
+    */
+    const results = [];
 
+    const query = `
+      PREFIX schema: <http://schema.org/>
+      PREFIX rdf: <https://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+      SELECT ?id WHERE {
+        ?s schema:identifier ?id .
+
+        ${filters.name ? `?s schema:name ?name .` : ''}
+        ${filters.addressRegion || filters.streetAddress ? `?s schema:address ?address .` : ''}
+        ${filters.addressRegion ? `?address schema:addressRegion ?addressRegion .` : ''}
+        ${filters.streetAddress ? `?address schema:streetAddress ?streetAddress .` : ''}
+        ${filters.type ? `?s rdf:type ?type .` : ''}
+        ${filters.reviewCount || filters.ratingValue ? `?s schema:aggregateRating ?aggregateRating .` : ''}
+        ${filters.reviewCount ? `?aggregateRating schema:reviewCount ?reviewCount .` : ''}
+        ${filters.ratingValue ? `?aggregateRating schema:ratingValue ?ratingValue .` : ''}
+
+        ${filters.name ? `FILTER(STRSTARTS(?name, "${filters.name}")).` : ''}
+        ${filters.addressRegion ? `FILTER(STRSTARTS(?addressRegion, "${filters.addressRegion}")).` : ''}
+        ${filters.streetAddress ? `FILTER(STRSTARTS(?streetAddress, "${filters.streetAddress}")).` : ''}
+        ${filters.type ? `FILTER(REGEX(STR(?type), "${filters.type}")).` : ''}
+        ${filters.reviewCount ? `FILTER(${filters.reviewCount} <= ?reviewCount).` : ''}
+        ${filters.ratingValue ? `FILTER(${filters.ratingValue} <= ?ratingValue).` : ''}
+      } LIMIT ${filters.page ? filters.page * 10 : 10}
+    `;
+
+    const queryResult = await db.graphs.sparql('application/sparql-results+json', query).result();
+
+    if (queryResult || queryResult.results || queryResult.results.bindings || queryResult.results.bindings.length) {
+      for (let i = 0; i < queryResult.results.bindings.length; i++) {
+        results.push(await this.getOfficeById(queryResult.results.bindings[i].id.value));
+
+        if (i === queryResult.results.bindings.length - 1) {
+          return results;
+        }
+      }
+    }
+
+    return [];
   }
 
   static async getOfficesPaginated(page) {
@@ -697,6 +732,4 @@ export default class Handlers {
 
     return {bindings: []};
   }
-
-  // TODO: create function for selecting by filtering
 }

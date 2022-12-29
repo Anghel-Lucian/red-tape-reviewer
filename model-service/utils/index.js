@@ -15,7 +15,7 @@ export function transformOfficeObjectToJsonLd(object) {
     ...object.aggregateRating ? {"aggregateRating": {
       "@type": "AggregateRating",
       "ratingValue": object.aggregateRating.ratingValue,
-      "ratingCount": object.aggregateRating.reviewCount
+      "reviewCount": object.aggregateRating.reviewCount
     }} : {},
     ...object.reviews ? {"reviews": {
       "@type": "ItemList",
